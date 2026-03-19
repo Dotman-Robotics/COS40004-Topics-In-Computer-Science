@@ -1,0 +1,7 @@
+BEGIN:VCALENDAR
+                    BEGIN:VEVENT
+                    SUMMARY:create event: Cheese Meeting, 2024-02-20 14:00, John Kimble
+                    DTSTART:20260320T100000
+                    END:VEVENT
+                    END:VCALENDAR
+                    
