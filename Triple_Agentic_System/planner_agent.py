@@ -1,7 +1,11 @@
 from ollama_client import ask_llm
+from vector import retriver
 import json
 
 def planner_agent(user_input):
+
+    email = retriver.invoke(user_input)
+
     prompt = f"""
 You are an AI planner.
 
@@ -20,9 +24,12 @@ Return ONLY valid JSON like this:
   ]
 }}
 
+if applicable, ensure the input for emails includes recipient email addresses from: {email}, else the recipient email address should just be their name.
+
 User request: {user_input}
 """
 
+    
     response = ask_llm(prompt)
 
     try:

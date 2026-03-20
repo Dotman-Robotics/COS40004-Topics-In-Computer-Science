@@ -6,9 +6,10 @@ from planner_agent import planner_agent
 from email_agent import email_agent
 from calendar_agent import calendar_agent
 
+
 def run_agent_system(user_input):
     plan = planner_agent(user_input)
-
+    
     print("\n--- PLAN ---")
     print(plan)
 
