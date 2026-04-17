@@ -1,6 +1,6 @@
 BEGIN:VCALENDAR
                     BEGIN:VEVENT
-                    SUMMARY:Schedule a meeting with Johnson White for Tuesday
+                    SUMMARY:Thursday, [Date]
                     DTSTART:20260320T100000
                     END:VEVENT
                     END:VCALENDAR

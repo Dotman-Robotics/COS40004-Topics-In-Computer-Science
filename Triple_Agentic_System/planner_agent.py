@@ -14,6 +14,7 @@ Decide which actions to take.
 Available actions:
 - email
 - calendar
+- check_inbox
 
 Return ONLY valid JSON like this:
 
@@ -21,8 +22,13 @@ Return ONLY valid JSON like this:
   "actions": [
     {{"type": "email", "input": "..."}},
     {{"type": "calendar", "input": "..."}}
+    {{"type": "check_inbox", "input": "..."}}
   ]
 }}
+
+Rules:
+- Use "check_inbox" if the user asks to read, check, or view emails.
+- For email actions, include recipient email from: {email} if available.
 
 if applicable, ensure the input for emails includes recipient email addresses from: {email}, else the recipient email address should just be their name.
 

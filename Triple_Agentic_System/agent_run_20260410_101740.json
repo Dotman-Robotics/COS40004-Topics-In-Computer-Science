@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-04-10T10:17:15.182378",
+    "user_input": "write to John about drinks on thursday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "To: jacki russell@domain.com\nSubject: Drinks on Thursday at 9pm"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "To: jacki russell@domain.com\nSubject: Drinks on Thursday at 9pm",
+            "output": {
+                "to": "jrussell@domain.com",
+                "subject": "Drinks on Thursday at 9pm",
+                "body": "Dear Jacki, I was wondering if you would like to meet for drinks this Thursday at 9pm. Let me know if this time works for you."
+            }
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-04-03T12:44:05.298682",
+    "user_input": "Email Johnson about Drinks on Thursday",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "To: Johnson White (jwhite@domain.com),\nSubject: Drinks on Thursday\nDear Johnson,\nBest regards, AI Planner"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "To: Johnson White (jwhite@domain.com),\nSubject: Drinks on Thursday\nDear Johnson,\nBest regards, AI Planner",
+            "output": {
+                "to": "jwhite@domain.com",
+                "subject": "Drinks on Thursday",
+                "body": "Dear Johnson, I wanted to invite you to drinks on Thursday. It would be great to catch up and discuss some new projects. Let me know if you're available."
+            }
+        }
+    ]
+}
