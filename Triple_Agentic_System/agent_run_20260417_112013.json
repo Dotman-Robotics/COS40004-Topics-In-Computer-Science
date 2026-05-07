@@ -1,0 +1,42 @@
+{
+    "timestamp": "2026-04-17T11:20:10.019558",
+    "user_input": "check mail and schedule meeting",
+    "plan": {
+        "actions": [
+            {
+                "type": "check_inbox",
+                "input": ""
+            },
+            {
+                "type": "calendar",
+                "input": "schedule meeting"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "check_inbox",
+            "input": "",
+            "output": [
+                {
+                    "from": "A J",
+                    "email": "CofC-A@outlook.com",
+                    "subject": "Drinks on Thursday",
+                    "body": "Yo Lateralus,\r\n\r\nLet's meet on thursday at 9pm for drinks\r\n\r\nCheers,\r\nCofC\r\n\r\nSent from Outlook for Android <https://aka.ms/AAb9ysg> ",
+                    "received_time": "2026-04-17 10:56:36.356000+00:00"
+                }
+            ]
+        },
+        {
+            "type": "calendar",
+            "input": "schedule meeting",
+            "output": {
+                "error": "Could not parse event",
+                "details": {
+                    "error": "datetime_parse_failed",
+                    "raw_text": "schedule meeting"
+                }
+            }
+        }
+    ]
+}

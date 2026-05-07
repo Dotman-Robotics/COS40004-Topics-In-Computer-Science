@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-04-23T22:32:35.723226",
+    "user_input": "Mail Johnson about Drinks on Friday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Johnson"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Johnson",
+            "output": {
+                "subject": "Drinks this Friday at 9pm",
+                "body": "Hi Johnson, I was wondering if you could meet me for drinks this Friday at 9pm. Let me know if that time works for you.",
+                "to": "jwhite@domain.com",
+                "from": "your_email@example.com"
+            }
+        }
+    ]
+}

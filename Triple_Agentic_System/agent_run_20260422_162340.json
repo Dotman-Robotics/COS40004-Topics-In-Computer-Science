@@ -1,0 +1,32 @@
+{
+    "timestamp": "2026-04-22T16:23:19.250364",
+    "user_input": "Email Jacki about drinks on Thursday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "To: Jacki Russell, subject: Drinks on Thursday\n9pm, see you then!"
+            },
+            {
+                "type": "calendar",
+                "input": "Add event\nDate: Thursday\nTime: 9pm"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "calendar",
+            "input": "Add event\nDate: Thursday\nTime: 9pm",
+            "output": {
+                "llm_output": "TITLE: Add Event\nDATE: 2024-02-22\nTIME: 21:00",
+                "parsed_event": {
+                    "title": "Add Event",
+                    "date": "2024-02-22",
+                    "time": "21:00"
+                },
+                "ics_file": "event.ics",
+                "outlook_status": "Event added to Outlook Calendar"
+            }
+        }
+    ]
+}

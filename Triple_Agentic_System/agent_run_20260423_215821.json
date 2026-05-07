@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-04-23T21:58:19.008914",
+    "user_input": "Mail Johnson about Drinks on Thursday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "[RecipientEmail: jwhite@domain.com, Subject: Drinks on Thursday at 9pm, Body: Let's get drinks on Thursday at 9pm! Best regards, AI Planner]"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "[RecipientEmail: jwhite@domain.com, Subject: Drinks on Thursday at 9pm, Body: Let's get drinks on Thursday at 9pm! Best regards, AI Planner]",
+            "output": {
+                "error": "Invalid JSON",
+                "raw": "{\"to\": \"jwhite@domain.com\", \"subject\": \"Drinks on Thursday at 9pm\", \"body\": \"Let\"}}"
+            }
+        }
+    ]
+}

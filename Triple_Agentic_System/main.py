@@ -4,6 +4,7 @@ from email_agent import email_agent, send_outlook_email, read_outlook_emails
 from calendar_agent import calendar_agent
 import datetime
 
+EMAIL_MONITOR_MODE = False
 
 def run_agent_system(user_input, save_json=True):
     plan = planner_agent(user_input)
@@ -43,7 +44,19 @@ def run_agent_system(user_input, save_json=True):
         elif action_type == "calendar":
             print("\n--- CALENDAR AGENT ---")
             calendar_result = calendar_agent(action_input)
-            print(calendar_result)
+
+            print("LLM Output:")
+            print(calendar_result.get("llm_output"))
+
+            print("\nParsed Event:")
+            print(calendar_result.get("parsed_event"))
+
+            print("\nICS File:")
+            print(calendar_result.get("ics_file"))
+
+            print("\nOutlook Status:")
+            print(calendar_result.get("outlook_status"))
+
             action_result["output"] = calendar_result
 
         elif action_type == "check_inbox":

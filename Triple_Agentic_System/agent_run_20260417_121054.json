@@ -1,0 +1,32 @@
+{
+    "timestamp": "2026-04-17T12:10:50.622959",
+    "user_input": "check mails and schedule meetings",
+    "plan": {
+        "actions": [
+            {
+                "type": "check_inbox",
+                "input": ""
+            },
+            {
+                "type": "calendar",
+                "input": ""
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "calendar",
+            "input": "",
+            "output": {
+                "llm_output": "I'm ready to extract the event details. Please go ahead and provide the text.",
+                "parsed_event": {
+                    "title": null,
+                    "date": null,
+                    "time": null
+                },
+                "ics_file": "event.ics",
+                "outlook_status": "Event added to Outlook Calendar"
+            }
+        }
+    ]
+}

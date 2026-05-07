@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-04-23T22:24:17.744295",
+    "user_input": "Mail Johnson about Drinks on Friday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Johnson"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Johnson",
+            "output": {
+                "error": "LLM response missing field: 'subject'",
+                "raw": "{\"to\": \"johnson.white@domain.com\", \"task\": \"Johnson\", \"subject\": \"\", \"body\": \"\", \"cc\": [], \"bcc\": []}"
+            }
+        }
+    ]
+}

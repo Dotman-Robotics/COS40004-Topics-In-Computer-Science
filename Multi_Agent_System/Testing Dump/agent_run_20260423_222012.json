@@ -1,0 +1,38 @@
+{
+    "timestamp": "2026-04-23T22:20:12.710040",
+    "user_input": "Mail Johnson about Drinks on Friday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "name": "email",
+                "input": "Johnson"
+            },
+            {
+                "name": "calendar",
+                "input": "Drinks on Friday at 9pm"
+            }
+        ],
+        "contact_found": true,
+        "request": "Mail Johnson about Drinks on Friday at 9pm",
+        "contact_info": {
+            "name": "Johnson White",
+            "email": "jwhite@domain.com"
+        }
+    },
+    "actions": [
+        {
+            "type": "",
+            "input": "Johnson",
+            "output": {
+                "error": "Unknown action: "
+            }
+        },
+        {
+            "type": "",
+            "input": "Drinks on Friday at 9pm",
+            "output": {
+                "error": "Unknown action: "
+            }
+        }
+    ]
+}

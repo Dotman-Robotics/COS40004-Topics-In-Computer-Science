@@ -1,0 +1,49 @@
+{
+    "timestamp": "2026-04-23T18:56:09.316492",
+    "user_input": "Email John about Drinks on Thursday at 9PM",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Email John about Drinks on Thursday at 9PM"
+            },
+            {
+                "type": "calendar",
+                "input": "Create event: Drinks on Thursday at 9PM"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Email John about Drinks on Thursday at 9PM",
+            "output": {
+                "error": "No matching contact found for: Email John about Drinks on Thursday at 9PM"
+            }
+        },
+        {
+            "type": "calendar",
+            "input": "Create event: Drinks on Thursday at 9PM",
+            "output": {
+                "llm_output": {
+                    "title": "Drinks",
+                    "date": "2026-04-23",
+                    "time": "21:00",
+                    "duration_minutes": 60,
+                    "location": "",
+                    "description": "on Thursday at 9PM"
+                },
+                "parsed_event": {
+                    "title": "Drinks",
+                    "date": "2026-04-23",
+                    "time": "21:00",
+                    "duration_minutes": 60,
+                    "location": "",
+                    "description": "on Thursday at 9PM"
+                },
+                "ics_file": "./event_Drinks_20260423_185612.ics",
+                "outlook_status": "Event 'Drinks' added to Outlook Calendar."
+            }
+        }
+    ]
+}

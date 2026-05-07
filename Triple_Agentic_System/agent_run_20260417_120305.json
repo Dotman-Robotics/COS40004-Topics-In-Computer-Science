@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-04-17T12:02:57.373172",
+    "user_input": "check mail and schedule meeting",
+    "plan": {
+        "actions": [
+            {
+                "type": "check_inbox",
+                "input": null
+            },
+            {
+                "type": "calendar",
+                "input": null
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "calendar",
+            "input": null,
+            "output": "I'm happy to help, but it seems like you haven't provided any event details. Could you please provide the details of the event you would like me to extract? I'll be more than happy to assist you once I have that information.\n\nPlease provide the following details:\n\n* TITLE (name or title of the event)\n* DATE (date(s) of the event)\n* TIME (time(s) of the event)\n\nI'll then be able to help you format them according to your request.\n\nSaved to event.ics"
+        }
+    ]
+}

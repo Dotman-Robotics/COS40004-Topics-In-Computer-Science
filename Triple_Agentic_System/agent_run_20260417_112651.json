@@ -1,0 +1,39 @@
+{
+    "timestamp": "2026-04-17T11:26:47.383113",
+    "user_input": "check mail and schedule meeting",
+    "plan": {
+        "actions": [
+            {
+                "type": "check_inbox",
+                "input": ""
+            },
+            {
+                "type": "email",
+                "input": "Agnes Nelson anelson@domain.com"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "check_inbox",
+            "input": "",
+            "output": [
+                {
+                    "from": "A J",
+                    "email": "CofC-A@outlook.com",
+                    "subject": "Drinks on Thursday",
+                    "body": "Yo Lateralus,\r\n\r\nLet's meet on thursday at 9pm for drinks\r\n\r\nCheers,\r\nCofC\r\n\r\nSent from Outlook for Android <https://aka.ms/AAb9ysg> ",
+                    "received_time": "2026-04-17 10:56:36.356000+00:00"
+                }
+            ]
+        },
+        {
+            "type": "email",
+            "input": "Agnes Nelson anelson@domain.com",
+            "output": {
+                "error": "Invalid JSON",
+                "raw": "Here is a professional email:\n\nSubject: Meeting Request for Discussion on Project Update\n\nDear Agnes,\n\nI hope this email finds you well. I am writing to request your time for a meeting to discuss the current status of our ongoing project.\n\nThe meeting details are as follows:\n- Date: Wednesday, [insert date]\n- Time: 2 PM\n- Location: Conference Room A\n\nDuring the meeting, we will review the latest progress and provide an update on any changes or concerns. Your input is valuable, and I look forward to discussing this further with you.\n\nPlease let me know if you have any conflicts or need any additional information from me prior to our meeting.\n\nBest regards,\n[Your Name]"
+            }
+        }
+    ]
+}

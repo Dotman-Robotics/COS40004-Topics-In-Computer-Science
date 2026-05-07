@@ -1,0 +1,52 @@
+{
+    "timestamp": "2026-04-23T22:39:29.298055",
+    "user_input": "Mail Johnson about Drinks on Friday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Johnson White"
+            },
+            {
+                "type": "calendar",
+                "input": "Drinks on Friday at 9pm"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Johnson White",
+            "output": {
+                "subject": "Drinks this Friday at 9pm",
+                "body": "Hi Johnson, I was wondering if you could meet me for drinks on Friday at 9pm? Let me know if that time works for you.",
+                "to": "jwhite@domain.com",
+                "from": "your_email@example.com"
+            }
+        },
+        {
+            "type": "calendar",
+            "input": "Drinks on Friday at 9pm",
+            "output": {
+                "llm_output": {
+                    "title": "Drinks",
+                    "date": "2026-04-23",
+                    "time": "21:00",
+                    "duration_minutes": 60,
+                    "location": "",
+                    "description": ""
+                },
+                "parsed_event": {
+                    "title": "Drinks",
+                    "date": "2026-04-23",
+                    "time": "21:00",
+                    "duration_minutes": 60,
+                    "location": "",
+                    "description": "Drinks on Friday at 9pm"
+                },
+                "ics_file": "./event_Drinks_20260423_223936.ics",
+                "outlook_status": "'Drinks' added to Outlook Calendar."
+            }
+        }
+    ]
+}

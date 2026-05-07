@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-04-17T12:01:31.599286",
+    "user_input": "check mails and schedule meetings",
+    "plan": {
+        "actions": [
+            {
+                "type": "check_inbox",
+                "input": ""
+            },
+            {
+                "type": "calendar",
+                "input": ""
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "calendar",
+            "input": "",
+            "output": {
+                "error": "Could not parse event"
+            }
+        }
+    ]
+}

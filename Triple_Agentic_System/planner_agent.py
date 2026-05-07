@@ -21,7 +21,7 @@ Return ONLY valid JSON like this:
 {{
   "actions": [
     {{"type": "email", "input": "..."}},
-    {{"type": "calendar", "input": "..."}}
+    {{"type": "calendar", "input": "..."}},
     {{"type": "check_inbox", "input": "..."}}
   ]
 }}

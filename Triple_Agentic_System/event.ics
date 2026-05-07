@@ -1,7 +1,10 @@
 BEGIN:VCALENDAR
-                    BEGIN:VEVENT
-                    SUMMARY:Thursday, [Date]
-                    DTSTART:20260320T100000
-                    END:VEVENT
-                    END:VCALENDAR
-                    
+VERSION:2.0
+PRODID:-//Agent System//EN
+BEGIN:VEVENT
+UID:20260422T062324Z
+DTSTAMP:20260422T062324Z
+SUMMARY:Add Event
+DTSTART:20240222T210000
+END:VEVENT
+END:VCALENDAR

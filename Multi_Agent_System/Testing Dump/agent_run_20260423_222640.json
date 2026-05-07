@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-04-23T22:26:36.117683",
+    "user_input": "Mail Johnson about Drinks on Friday at 9pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Johnson"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Johnson",
+            "output": {
+                "subject": "Meeting Request for Task Johnson",
+                "body": "Dear Johnson White, I hope this email finds you well. I am writing to request your presence at a meeting to discuss the current status of task Johnson.",
+                "to": "jwhite@domain.com"
+            }
+        }
+    ]
+}
