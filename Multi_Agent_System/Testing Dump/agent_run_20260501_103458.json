@@ -1,0 +1,57 @@
+{
+    "timestamp": "2026-05-01T10:34:28.269634",
+    "user_input": "Write to Johnson and ask him to meet for lunch at Nevermind Bar at 4pm",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Johnson White"
+            },
+            {
+                "type": "calendar",
+                "input": "Meet for lunch at Nevermind Bar at 4pm"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Johnson White",
+            "output": {
+                "subject": "Lunch Invitation",
+                "body": "Dear Johnson, I was wondering if you would be available to meet for lunch at Nevermind Bar at 4pm? Looking forward to hearing back from you.",
+                "to": "jwhite@domain.com",
+                "from": "your_email@example.com"
+            }
+        },
+        {
+            "type": "calendar",
+            "input": "Meet for lunch at Nevermind Bar at 4pm",
+            "output": {
+                "llm_output": {
+                    "title": "Meet for lunch",
+                    "date": "2026-05-01",
+                    "time": "16:00",
+                    "duration_minutes": 60,
+                    "location": "Nevermind Bar",
+                    "description": ""
+                },
+                "parsed_event": {
+                    "title": "Meet for lunch",
+                    "date": "2026-05-01",
+                    "time": "16:00",
+                    "duration_minutes": 60,
+                    "location": "Nevermind Bar",
+                    "description": "Meet for lunch at Nevermind Bar at 4pm"
+                },
+                "availability": {
+                    "available": true,
+                    "conflicts": [],
+                    "suggested_alternatives": []
+                },
+                "ics_file": "./event_Meet_for_lunch_20260501_103440.ics",
+                "outlook_status": "'Meet for lunch' added to Outlook Calendar."
+            }
+        }
+    ]
+}

@@ -1,0 +1,14 @@
+{
+    "session_overview": "Automated monitor flagged user A J for being blacklisted, preventing them from scheduling a meeting via Zoom.",
+    "meetings_booked": [],
+    "meetings_declined": [],
+    "clarifications_requested": [],
+    "non_meeting_emails": [
+        {
+            "from": "A J",
+            "subject": "Zoom",
+            "summary": "User flagged for being blacklisted"
+        }
+    ],
+    "attention_needed": []
+}

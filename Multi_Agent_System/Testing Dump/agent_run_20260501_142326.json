@@ -1,0 +1,56 @@
+{
+    "timestamp": "2026-05-01T14:22:46.042729",
+    "user_input": "Email Tom and ask him to meet me at The Nevermind bar on Friday at 3pm for drinks",
+    "plan": {
+        "actions": [
+            {
+                "type": "email",
+                "input": "Thomas Conley"
+            },
+            {
+                "type": "calendar",
+                "input": "Meet Tom at The Nevermind bar on Friday at 3pm for drinks"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "email",
+            "input": "Thomas Conley",
+            "output": {
+                "subject": "Meeting Invitation",
+                "body": "Dear Thomas, I was wondering if you could meet me at The Nevermind bar this Friday at 3pm for a drink. Would be great to catch up. Best regards,",
+                "to": "tconley@domain.com"
+            }
+        },
+        {
+            "type": "calendar",
+            "input": "Meet Tom at The Nevermind bar on Friday at 3pm for drinks",
+            "output": {
+                "llm_output": {
+                    "title": "Meet Tom",
+                    "date": "2026-05-01",
+                    "time": "15:00",
+                    "duration_minutes": 60,
+                    "location": "The Nevermind bar",
+                    "description": "for drinks"
+                },
+                "parsed_event": {
+                    "title": "Meet Tom",
+                    "date": "2026-05-01",
+                    "time": "15:00",
+                    "duration_minutes": 60,
+                    "location": "The Nevermind bar",
+                    "description": "for drinks"
+                },
+                "availability": {
+                    "available": true,
+                    "conflicts": [],
+                    "suggested_alternatives": []
+                },
+                "ics_file": "./event_Meet_Tom_20260501_142326.ics",
+                "outlook_status": "'Meet Tom' added to Outlook Calendar."
+            }
+        }
+    ]
+}
