@@ -1,0 +1,118 @@
+{
+  "meeting_request:_project_sync": {
+    "thread_id": "meeting_request:_project_sync",
+    "title": "Project Sync",
+    "duration": 60,
+    "initiator": "agent_a@example.com",
+    "rounds": 5,
+    "status": "confirmed",
+    "history": [
+      {
+        "round": 1,
+        "action": "confirmed",
+        "slot": {
+          "date": "2026-05-21",
+          "time": "09:00"
+        }
+      },
+      {
+        "round": 2,
+        "action": "counter_proposal",
+        "slots_offered": [
+          {
+            "date": "2026-05-21",
+            "time": "08:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "10:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "11:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "12:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "13:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "14:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "15:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "16:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "17:00"
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "action": "confirmed",
+        "slot": {
+          "date": "2026-05-21",
+          "time": "08:00"
+        }
+      },
+      {
+        "round": 4,
+        "action": "counter_proposal",
+        "slots_offered": [
+          {
+            "date": "2026-05-21",
+            "time": "10:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "11:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "12:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "13:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "14:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "15:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "16:00"
+          },
+          {
+            "date": "2026-05-21",
+            "time": "17:00"
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "action": "confirmed",
+        "slot": {
+          "date": "2026-05-21",
+          "time": "10:00"
+        }
+      }
+    ],
+    "created_at": "2026-05-20T12:50:56.933021",
+    "closed_at": "2026-05-20T12:53:56.558284"
+  }
+}

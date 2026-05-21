@@ -1,0 +1,2195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0e0e10;
+        --surface: #17171a;
+        --surface2: #1f1f24;
+        --border: #2a2a30;
+        --accent: #6c63ff;
+        --accent2: #a78bfa;
+        --green: #34d399;
+        --red: #f87171;
+        --amber: #fbbf24;
+        --text: #e8e8f0;
+        --muted: #6b6b7e;
+        --mono: "DM Mono", monospace;
+        --sans: "Syne", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        grid-template-rows: 56px 1fr;
+      }
+
+      /* ── Header ── */
+      header {
+        grid-column: 1 / -1;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        gap: 12px;
+      }
+      .logo {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent2);
+      }
+      .logo span {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .monitor-pill {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+        transition: background 0.3s;
+      }
+      .dot.active {
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+
+      /* ── Sidebar ── */
+      nav {
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        padding: 16px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        cursor: pointer;
+        border-left: 2px solid transparent;
+        transition: all 0.15s;
+        user-select: none;
+      }
+      .nav-item:hover {
+        color: var(--text);
+        background: var(--surface2);
+      }
+      .nav-item.active {
+        color: var(--accent2);
+        border-left-color: var(--accent);
+        background: rgba(108, 99, 255, 0.08);
+      }
+      .nav-icon {
+        font-size: 16px;
+        width: 18px;
+        text-align: center;
+      }
+      .nav-section {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 16px 20px 6px;
+      }
+
+      /* ── Main ── */
+      main {
+        overflow-y: auto;
+        padding: 28px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      /* ── Panels ── */
+      .panel {
+        display: none;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .panel.active {
+        display: flex;
+      }
+
+      .page-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .page-sub {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* ── Command input ── */
+      .cmd-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .cmd-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+      textarea {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 14px;
+        padding: 12px 14px;
+        resize: none;
+        outline: none;
+        transition: border-color 0.15s;
+        min-height: 52px;
+        max-height: 140px;
+      }
+      textarea:focus {
+        border-color: var(--accent);
+      }
+      textarea::placeholder {
+        color: var(--muted);
+      }
+
+      button {
+        font-family: var(--sans);
+        font-weight: 600;
+        font-size: 13px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        padding: 12px 20px;
+      }
+      .btn-primary:hover {
+        background: var(--accent2);
+      }
+      .btn-primary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .btn-secondary {
+        background: var(--surface2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 10px 16px;
+      }
+      .btn-secondary:hover {
+        border-color: var(--accent);
+        color: var(--accent2);
+      }
+
+      .btn-green {
+        background: rgba(52, 211, 153, 0.15);
+        color: var(--green);
+        border: 1px solid rgba(52, 211, 153, 0.3);
+        padding: 10px 16px;
+      }
+      .btn-green:hover {
+        background: rgba(52, 211, 153, 0.25);
+      }
+      .btn-red {
+        background: rgba(248, 113, 113, 0.15);
+        color: var(--red);
+        border: 1px solid rgba(248, 113, 113, 0.3);
+        padding: 10px 16px;
+      }
+      .btn-red:hover {
+        background: rgba(248, 113, 113, 0.25);
+      }
+      .btn-amber {
+        background: rgba(251, 191, 36, 0.15);
+        color: var(--amber);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        padding: 10px 16px;
+      }
+      .btn-amber:hover {
+        background: rgba(251, 191, 36, 0.25);
+      }
+
+      /* ── Output / log ── */
+      .output-area {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text);
+        min-height: 80px;
+        max-height: 420px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.7;
+      }
+      .output-area .line-ok {
+        color: var(--green);
+      }
+      .output-area .line-err {
+        color: var(--red);
+      }
+      .output-area .line-info {
+        color: var(--accent2);
+      }
+      .output-area .line-muted {
+        color: var(--muted);
+      }
+
+      /* ── Cards ── */
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: border-color 0.15s;
+      }
+      .card:hover {
+        border-color: #3a3a44;
+      }
+      .card-from {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent2);
+      }
+      .card-sub {
+        font-size: 12px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .card-body {
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.5;
+      }
+      .card-time {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .badge {
+        display: inline-block;
+        font-size: 10px;
+        font-family: var(--mono);
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-weight: 500;
+      }
+      .badge-meeting {
+        background: rgba(108, 99, 255, 0.2);
+        color: var(--accent2);
+      }
+      .badge-action {
+        background: rgba(251, 191, 36, 0.2);
+        color: var(--amber);
+      }
+      .badge-info {
+        background: rgba(52, 211, 153, 0.2);
+        color: var(--green);
+      }
+      .badge-other {
+        background: rgba(107, 107, 126, 0.2);
+        color: var(--muted);
+      }
+      .badge-high {
+        background: rgba(248, 113, 113, 0.2);
+        color: var(--red);
+      }
+      .badge-medium {
+        background: rgba(251, 191, 36, 0.2);
+        color: var(--amber);
+      }
+      .badge-low {
+        background: rgba(52, 211, 153, 0.2);
+        color: var(--green);
+      }
+
+      /* ── Monitor ── */
+      .monitor-controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .stat-row {
+        display: flex;
+        gap: 16px;
+      }
+      .stat {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 120px;
+      }
+      .stat-val {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .stat-label {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+
+      /* ── Session summary ── */
+      .summary-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .summary-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--accent2);
+      }
+      .summary-item {
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.6;
+        padding-left: 12px;
+        border-left: 2px solid var(--border);
+      }
+      .summary-item strong {
+        color: var(--accent2);
+      }
+
+      /* ── Search / Provider sourcing ── */
+      .provider-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 14px;
+      }
+      .provider-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: border-color 0.15s;
+      }
+      .provider-card:hover {
+        border-color: #3a3a44;
+      }
+      .provider-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .provider-url {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--accent2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-decoration: none;
+      }
+      .provider-url:hover {
+        text-decoration: underline;
+      }
+      .provider-snippet {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .contact-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .contact-item {
+        font-size: 12px;
+        font-family: var(--mono);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .contact-item .ci-icon {
+        color: var(--muted);
+        width: 14px;
+        flex-shrink: 0;
+      }
+      .contact-item .ci-val {
+        color: var(--text);
+        word-break: break-all;
+      }
+      .contact-item .ci-none {
+        color: var(--muted);
+        font-style: italic;
+      }
+      .provider-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      /* Draft modal overlay */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        width: 640px;
+        max-width: 95vw;
+        max-height: 85vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .modal-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .modal-label {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .modal input,
+      .modal textarea {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 10px 12px;
+        outline: none;
+        transition: border-color 0.15s;
+        width: 100%;
+      }
+      .modal input:focus,
+      .modal textarea:focus {
+        border-color: var(--accent);
+      }
+      .modal textarea {
+        resize: vertical;
+        min-height: 180px;
+        line-height: 1.6;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      .search-n-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .search-n-row input[type="number"] {
+        width: 56px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 13px;
+        padding: 6px 10px;
+        outline: none;
+      }
+      .no-contact {
+        font-size: 11px;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .bl-input-row {
+        display: flex;
+        gap: 10px;
+      }
+      .bl-input-row input[type="email"] {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 10px 14px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .bl-input-row input[type="email"]:focus {
+        border-color: var(--accent);
+      }
+      .bl-input-row input[type="email"]::placeholder {
+        color: var(--muted);
+      }
+
+      .bl-list {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .bl-empty {
+        padding: 20px;
+        font-size: 13px;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      .bl-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 16px;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.1s;
+      }
+      .bl-row:last-child {
+        border-bottom: none;
+      }
+      .bl-row:hover {
+        background: var(--surface2);
+      }
+      .bl-addr {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--text);
+      }
+      .bl-remove {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 16px;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition:
+          color 0.15s,
+          background 0.15s;
+        line-height: 1;
+      }
+      .bl-remove:hover {
+        color: var(--red);
+        background: rgba(248, 113, 113, 0.1);
+      }
+
+      .btn-block {
+        background: rgba(248, 113, 113, 0.1);
+        color: var(--red);
+        border: 1px solid rgba(248, 113, 113, 0.25);
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: var(--mono);
+        font-weight: 500;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .btn-block:hover {
+        background: rgba(248, 113, 113, 0.22);
+      }
+      .btn-block.blocked {
+        background: rgba(107, 107, 126, 0.15);
+        color: var(--muted);
+        border-color: var(--border);
+        cursor: default;
+      }
+
+      .bl-count {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        margin-left: auto;
+        padding: 2px 8px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 99px;
+      }
+      .spin {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Divider ── */
+      hr {
+        border: none;
+        border-top: 1px solid var(--border);
+      }
+
+      .empty {
+        color: var(--muted);
+        font-size: 13px;
+        font-family: var(--mono);
+        padding: 16px 0;
+      }
+
+      /* ── Negotiations ── */
+      .neg-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .neg-table th {
+        text-align: left;
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--border);
+        letter-spacing: 0.04em;
+      }
+      .neg-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+        color: var(--text);
+      }
+      .neg-table tr:last-child td {
+        border-bottom: none;
+      }
+      .neg-table tr:hover td {
+        background: var(--surface2);
+      }
+      .neg-status {
+        font-size: 11px;
+        font-family: var(--mono);
+        padding: 2px 8px;
+        border-radius: 99px;
+        white-space: nowrap;
+      }
+      .neg-status.active {
+        background: rgba(251, 191, 36, 0.18);
+        color: var(--amber);
+      }
+      .neg-status.confirmed {
+        background: rgba(52, 211, 153, 0.18);
+        color: var(--green);
+      }
+      .neg-status.failed {
+        background: rgba(248, 113, 113, 0.18);
+        color: var(--red);
+      }
+      .neg-status.rejected {
+        background: rgba(107, 107, 126, 0.18);
+        color: var(--muted);
+      }
+      .neg-history {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .sim-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .sim-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .sim-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .sim-label {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .sim-field input {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 13px;
+        padding: 8px 10px;
+        outline: none;
+        transition: border-color 0.15s;
+        width: 160px;
+      }
+      .sim-field input:focus {
+        border-color: var(--accent);
+      }
+      .transcript-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .transcript-step {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .transcript-step:last-child {
+        border-bottom: none;
+      }
+      .t-round {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--muted);
+        min-width: 48px;
+        padding-top: 2px;
+        flex-shrink: 0;
+      }
+      .t-body {
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.5;
+      }
+      .t-action {
+        font-size: 11px;
+        font-family: var(--mono);
+        padding: 1px 7px;
+        border-radius: 99px;
+        margin-left: 6px;
+      }
+      .t-confirmed {
+        background: rgba(52, 211, 153, 0.18);
+        color: var(--green);
+      }
+      .t-counter {
+        background: rgba(251, 191, 36, 0.18);
+        color: var(--amber);
+      }
+      .t-rejected {
+        background: rgba(107, 107, 126, 0.18);
+        color: var(--muted);
+      }
+      .t-failed {
+        background: rgba(248, 113, 113, 0.18);
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">Agent <span>System</span></div>
+      <div class="monitor-pill">
+        <div class="dot" id="monitorDot"></div>
+        <span id="monitorLabel">Monitor off</span>
+      </div>
+    </header>
+
+    <nav>
+      <div class="nav-section">Actions</div>
+      <div class="nav-item active" data-panel="run">
+        <span class="nav-icon">⌘</span> Run Command
+      </div>
+      <div class="nav-item" data-panel="search">
+        <span class="nav-icon">◈</span> Source Providers
+      </div>
+      <div class="nav-item" data-panel="inbox">
+        <span class="nav-icon">✉</span> Inbox
+      </div>
+      <div class="nav-section">Monitor</div>
+      <div class="nav-item" data-panel="negotiations">
+        <span class="nav-icon">⇄</span> Negotiations
+      </div>
+      <div class="nav-item" data-panel="monitor">
+        <span class="nav-icon">⟳</span> Monitor
+      </div>
+      <div class="nav-item" data-panel="session">
+        <span class="nav-icon">◎</span> Session Log
+      </div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item" data-panel="blacklist">
+        <span class="nav-icon">⊘</span> Blacklist
+      </div>
+    </nav>
+
+    <main>
+      <!-- ── Run Command ── -->
+      <div class="panel active" id="panel-run">
+        <div>
+          <div class="page-title">Run Command</div>
+          <div class="page-sub">
+            Type a natural language request — the planner will route it to
+            email, calendar, or inbox.
+          </div>
+        </div>
+
+        <div class="cmd-box">
+          <div class="cmd-row">
+            <textarea
+              id="cmdInput"
+              rows="2"
+              placeholder="e.g. Send an email to Johnson about the Friday meeting…"
+            ></textarea>
+            <button class="btn-primary" id="runBtn" onclick="runCommand()">
+              Run
+            </button>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button
+              class="btn-secondary"
+              onclick="setInput('Send an email to ')"
+            >
+              ✉ Email
+            </button>
+            <button
+              class="btn-secondary"
+              onclick="setInput('Schedule a meeting ')"
+            >
+              📅 Calendar
+            </button>
+            <button class="btn-secondary" onclick="setInput('Check my inbox')">
+              📥 Inbox
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div
+            style="
+              font-size: 12px;
+              font-family: var(--mono);
+              color: var(--muted);
+              margin-bottom: 8px;
+            "
+          >
+            OUTPUT
+          </div>
+          <div class="output-area" id="runOutput">Ready.</div>
+        </div>
+
+        <div id="actionCards" class="card-grid"></div>
+      </div>
+
+      <!-- ── Source Providers ── -->
+      <div class="panel" id="panel-search">
+        <div>
+          <div class="page-title">Source Providers</div>
+          <div class="page-sub">
+            Describe what you need done — the system will find relevant
+            businesses, scrape their contact details, and let you send outreach
+            emails directly.
+          </div>
+        </div>
+
+        <div class="cmd-box">
+          <div class="cmd-row">
+            <textarea
+              id="searchInput"
+              rows="2"
+              placeholder="e.g. find painters to paint the office, source catering companies for an event…"
+            ></textarea>
+            <button class="btn-primary" id="searchBtn" onclick="runSearch()">
+              Search
+            </button>
+          </div>
+          <div class="search-n-row">
+            Find up to
+            <input type="number" id="searchN" value="5" min="1" max="15" />
+            providers
+            <span
+              style="margin-left: auto; font-size: 12px; color: var(--muted)"
+              >Results are scraped live — allow 15–30s</span
+            >
+          </div>
+        </div>
+
+        <div id="searchStatus" style="display: none">
+          <div class="output-area" id="searchLog"></div>
+        </div>
+
+        <div id="searchMeta" style="display: none">
+          <div
+            style="
+              font-size: 12px;
+              font-family: var(--mono);
+              color: var(--muted);
+              margin-bottom: 8px;
+            "
+            id="searchMetaText"
+          ></div>
+        </div>
+
+        <div class="provider-grid" id="providerCards"></div>
+      </div>
+
+      <!-- Draft / send modal -->
+      <div class="modal-overlay" id="draftModal">
+        <div class="modal">
+          <div class="modal-title">Draft Outreach Email</div>
+
+          <div class="modal-field">
+            <div class="modal-label">To</div>
+            <input
+              type="email"
+              id="draftTo"
+              placeholder="recipient@example.com"
+            />
+          </div>
+          <div class="modal-field">
+            <div class="modal-label">Subject</div>
+            <input type="text" id="draftSubject" />
+          </div>
+          <div class="modal-field">
+            <div class="modal-label">Body</div>
+            <textarea id="draftBody"></textarea>
+          </div>
+          <div class="modal-field">
+            <div class="modal-label">
+              Additional context for the LLM (optional)
+            </div>
+            <input
+              type="text"
+              id="draftContext"
+              placeholder="e.g. budget, timeline, office size…"
+            />
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeDraftModal()">
+              Cancel
+            </button>
+            <button class="btn-amber" id="redraftBtn" onclick="redraftEmail()">
+              ↻ Redraft
+            </button>
+            <button
+              class="btn-green"
+              id="sendDraftBtn"
+              onclick="sendDraftEmail()"
+            >
+              Send via Outlook
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Inbox ── -->
+      <div class="panel" id="panel-inbox">
+        <div>
+          <div class="page-title">Inbox</div>
+          <div class="page-sub">
+            Unread emails from your Outlook account, summarized.
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <button class="btn-primary" onclick="loadInbox()">Refresh</button>
+          <label
+            style="
+              font-size: 13px;
+              color: var(--muted);
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
+          >
+            <input
+              type="checkbox"
+              id="unreadOnly"
+              checked
+              style="accent-color: var(--accent)"
+            />
+            Unread only
+          </label>
+          <label
+            style="
+              font-size: 13px;
+              color: var(--muted);
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
+          >
+            Max
+            <input
+              type="number"
+              id="maxEmails"
+              value="10"
+              min="1"
+              max="50"
+              style="
+                width: 52px;
+                background: var(--surface2);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                color: var(--text);
+                font-family: var(--sans);
+                font-size: 13px;
+                padding: 4px 8px;
+                outline: none;
+              "
+            />
+          </label>
+        </div>
+        <div id="inboxCards" class="card-grid">
+          <div class="empty">Click Refresh to load emails.</div>
+        </div>
+      </div>
+
+      <!-- ── Monitor ── -->
+      <div class="panel" id="panel-monitor">
+        <div>
+          <div class="page-title">Email Monitor</div>
+          <div class="page-sub">
+            Automatically polls inbox, detects meeting requests, checks
+            availability, and replies.
+          </div>
+        </div>
+
+        <div class="stat-row" id="monitorStats">
+          <div class="stat">
+            <div class="stat-val" id="statStatus">OFF</div>
+            <div class="stat-label">status</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="statCount">0</div>
+            <div class="stat-label">emails processed</div>
+          </div>
+        </div>
+
+        <div class="monitor-controls">
+          <button class="btn-green" onclick="monitorStart()">
+            ▶ Start Monitor
+          </button>
+          <button class="btn-red" onclick="monitorStop()">
+            ■ Stop &amp; Summarize
+          </button>
+          <button class="btn-amber" onclick="monitorPoll()">↻ Poll Now</button>
+        </div>
+
+        <div>
+          <div
+            style="
+              font-size: 12px;
+              font-family: var(--mono);
+              color: var(--muted);
+              margin-bottom: 8px;
+            "
+          >
+            MONITOR LOG
+          </div>
+          <div class="output-area" id="monitorOutput">Monitor not started.</div>
+        </div>
+      </div>
+
+      <!-- ── Negotiations ── -->
+      <div class="panel" id="panel-negotiations">
+        <div>
+          <div class="page-title">Negotiations</div>
+          <div class="page-sub">
+            Live and historical meeting negotiation threads. Each thread tracks
+            rounds, slots offered, and final outcome.
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px">
+          <button class="btn-primary" onclick="loadNegotiations()">
+            Refresh
+          </button>
+        </div>
+
+        <div
+          id="negTable"
+          style="
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+          "
+        >
+          <div class="empty" style="padding: 20px">
+            Click Refresh to load negotiation threads.
+          </div>
+        </div>
+
+        <hr />
+
+        <div>
+          <div class="page-title" style="font-size: 16px; margin-bottom: 4px">
+            Simulation
+          </div>
+          <div class="page-sub">
+            Test two agents negotiating in-process — no real emails sent. Uses
+            your live Outlook calendar for availability.
+          </div>
+        </div>
+
+        <div class="sim-box">
+          <div class="sim-row">
+            <div class="sim-field">
+              <div class="sim-label">Meeting title</div>
+              <input type="text" id="simTitle" value="Project Sync" />
+            </div>
+            <div class="sim-field">
+              <div class="sim-label">Duration (min)</div>
+              <input
+                type="number"
+                id="simDuration"
+                value="60"
+                min="15"
+                max="480"
+              />
+            </div>
+            <div class="sim-field">
+              <div class="sim-label">Initial date</div>
+              <input type="date" id="simDate" />
+            </div>
+            <div class="sim-field">
+              <div class="sim-label">Initial time</div>
+              <input type="time" id="simTime" value="09:00" />
+            </div>
+            <div class="sim-field">
+              <div class="sim-label">Max rounds</div>
+              <input
+                type="number"
+                id="simMaxRounds"
+                value="8"
+                min="2"
+                max="20"
+              />
+            </div>
+            <button
+              class="btn-amber"
+              id="simBtn"
+              onclick="runSimulation()"
+              style="align-self: flex-end"
+            >
+              ▶ Run Simulation
+            </button>
+          </div>
+        </div>
+
+        <div id="simResult" style="display: none">
+          <div
+            style="
+              font-size: 12px;
+              font-family: var(--mono);
+              color: var(--muted);
+              margin-bottom: 8px;
+            "
+            id="simOutcomeLine"
+          ></div>
+          <div class="transcript-wrap" id="simTranscript"></div>
+        </div>
+      </div>
+
+      <!-- ── Session Log ── -->
+      <div class="panel" id="panel-session">
+        <div>
+          <div class="page-title">Session Log</div>
+          <div class="page-sub">
+            Summary of the last completed monitor session.
+          </div>
+        </div>
+        <div id="sessionContent">
+          <div class="empty">
+            Stop the monitor to generate a session summary.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Blacklist ── -->
+      <div class="panel" id="panel-blacklist">
+        <div>
+          <div
+            class="page-title"
+            style="display: flex; align-items: center; gap: 12px"
+          >
+            Blacklist
+            <span class="bl-count" id="blCount">0 addresses</span>
+          </div>
+          <div class="page-sub">
+            Emails from blacklisted addresses are silently skipped by the
+            monitor — no summarization, no LLM calls, no replies.
+          </div>
+        </div>
+
+        <div class="bl-input-row">
+          <input
+            type="email"
+            id="blInput"
+            placeholder="name@example.com"
+            autocomplete="off"
+          />
+          <button class="btn-red" onclick="blacklistAdd()">
+            Block Address
+          </button>
+        </div>
+
+        <div class="bl-list" id="blList">
+          <div class="bl-empty">No addresses blocked yet.</div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const API = "http://localhost:5000/api";
+      let monitorInterval = null;
+
+      // ── Navigation ────────────────────────────────────────────────────────────────
+      document.querySelectorAll(".nav-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          document
+            .querySelectorAll(".nav-item")
+            .forEach((n) => n.classList.remove("active"));
+          document
+            .querySelectorAll(".panel")
+            .forEach((p) => p.classList.remove("active"));
+          item.classList.add("active");
+          document
+            .getElementById("panel-" + item.dataset.panel)
+            .classList.add("active");
+
+          if (item.dataset.panel === "inbox") loadInbox();
+          if (item.dataset.panel === "monitor") refreshMonitorStatus();
+          if (item.dataset.panel === "blacklist") loadBlacklist();
+          if (item.dataset.panel === "search")
+            document.getElementById("searchInput").focus();
+          if (item.dataset.panel === "negotiations") loadNegotiations();
+        });
+      });
+
+      // ── Helpers ───────────────────────────────────────────────────────────────────
+      function setInput(text) {
+        const el = document.getElementById("cmdInput");
+        el.value = text;
+        el.focus();
+        el.setSelectionRange(text.length, text.length);
+      }
+
+      function log(el, text, cls = "") {
+        const line = document.createElement("div");
+        if (cls) line.className = cls;
+        line.textContent = text;
+        el.appendChild(line);
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function clearEl(id) {
+        document.getElementById(id).innerHTML = "";
+      }
+
+      function categoryBadge(cat) {
+        const map = {
+          meeting_request: ["meeting", "meeting"],
+          action_required: ["action", "action"],
+          information: ["info", "info"],
+          reply_needed: ["reply needed", "action"],
+          other: ["other", "other"],
+        };
+        const [label, cls] = map[cat] || ["other", "other"];
+        return `<span class="badge badge-${cls}">${label}</span>`;
+      }
+
+      function priorityBadge(p) {
+        return `<span class="badge badge-${p || "medium"}">${p || "medium"}</span>`;
+      }
+
+      // ── Run Command ───────────────────────────────────────────────────────────────
+      async function runCommand() {
+        const input = document.getElementById("cmdInput").value.trim();
+        if (!input) return;
+
+        const out = document.getElementById("runOutput");
+        const btn = document.getElementById("runBtn");
+        const cards = document.getElementById("actionCards");
+
+        out.innerHTML = "";
+        cards.innerHTML = "";
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span>';
+
+        log(out, `→ ${input}`, "line-info");
+
+        try {
+          const res = await fetch(`${API}/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            log(out, `✗ Error: ${data.error}`, "line-err");
+            return;
+          }
+
+          const actions = data.plan?.actions || [];
+          log(
+            out,
+            `✓ Plan: ${actions.map((a) => a.type).join(", ") || "no actions"}`,
+            "line-ok",
+          );
+
+          for (const action of data.actions || []) {
+            log(out, `\n[${action.type.toUpperCase()}]`, "line-info");
+
+            if (action.type === "email") {
+              const o = action.output;
+              if (o?.error) {
+                log(out, `  ✗ ${o.error}`, "line-err");
+              } else {
+                log(out, `  To:      ${o?.to}`, "line-ok");
+                log(out, `  Subject: ${o?.subject}`);
+                log(out, `  Body:    ${(o?.body || "").slice(0, 120)}…`);
+                renderEmailCard(cards, o);
+              }
+            } else if (action.type === "calendar") {
+              const o = action.output;
+              const ev = o?.parsed_event;
+              if (ev) {
+                log(
+                  out,
+                  `  ✓ ${ev.title} on ${ev.date} at ${ev.time}`,
+                  "line-ok",
+                );
+                log(out, `  ${o?.outlook_status}`);
+                renderCalendarCard(cards, ev, o);
+              } else {
+                log(out, `  ✗ Could not parse event`, "line-err");
+              }
+            } else if (action.type === "check_inbox") {
+              const emails = action.output || [];
+              log(out, `  ✓ ${emails.length} email(s) retrieved`, "line-ok");
+              for (const e of emails) renderInboxCard(cards, e);
+            } else {
+              log(out, `  ${JSON.stringify(action.output)}`, "line-muted");
+            }
+          }
+
+          log(out, `\n✓ Log saved: ${data.log_file}`, "line-muted");
+        } catch (err) {
+          log(out, `✗ Request failed: ${err.message}`, "line-err");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Run";
+        }
+      }
+
+      document.getElementById("cmdInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          runCommand();
+        }
+      });
+
+      function renderEmailCard(container, email) {
+        if (!email) return;
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+    <div class="card-from">✉ ${email.to}</div>
+    <div class="card-sub">${email.subject}</div>
+    <div class="card-body">${(email.body || "").slice(0, 200)}</div>`;
+        container.appendChild(card);
+      }
+
+      function renderCalendarCard(container, ev, raw) {
+        const avail = raw?.availability;
+        const status = avail?.available ? "✓ Slot free" : "⚠ Conflict detected";
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+    <div class="card-from">📅 ${ev.title}</div>
+    <div class="card-sub">${ev.date} at ${ev.time} · ${ev.duration_minutes}min</div>
+    <div class="card-body">${ev.location ? "📍 " + ev.location + "<br>" : ""}${ev.description ? ev.description.slice(0, 120) : ""}</div>
+    <div class="card-time">${status}</div>`;
+        container.appendChild(card);
+      }
+
+      // ── Inbox ─────────────────────────────────────────────────────────────────────
+      async function loadInbox() {
+        const cards = document.getElementById("inboxCards");
+        const max = document.getElementById("maxEmails").value || 10;
+        const unread = document.getElementById("unreadOnly").checked;
+        cards.innerHTML = `<div class="empty"><span class="spin"></span> Loading…</div>`;
+
+        try {
+          const res = await fetch(
+            `${API}/inbox?max=${max}&unread_only=${unread}`,
+          );
+          const data = await res.json();
+          cards.innerHTML = "";
+
+          if (!data.emails?.length) {
+            cards.innerHTML = `<div class="empty">No emails found.</div>`;
+            return;
+          }
+
+          for (const email of data.emails) renderInboxCard(cards, email);
+        } catch (err) {
+          cards.innerHTML = `<div class="empty">Error: ${err.message}</div>`;
+        }
+      }
+
+      function renderInboxCard(container, email) {
+        const summary = email.summary || {};
+        const cat = summary.category || "other";
+        const pri = summary.priority || "medium";
+        const text = summary.summary || email.body?.slice(0, 150) || "";
+        const actions = (summary.action_items || []).slice(0, 2);
+        const addr = (email.email || "").toLowerCase();
+        const blocked = _localBlacklist.has(addr);
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.emailAddr = addr;
+        card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="card-from">${email.from}</div>
+      <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
+        ${categoryBadge(cat)}${priorityBadge(pri)}
+        <button class="btn-block${blocked ? " blocked" : ""}"
+          onclick="quickBlock('${addr}', this)"
+          ${blocked ? "disabled" : ""}>
+          ${blocked ? "Blocked" : "⊘ Block"}
+        </button>
+      </div>
+    </div>
+    <div class="card-sub">${email.subject}</div>
+    <div class="card-body">${text}</div>
+    ${actions.length ? `<div style="font-size:12px;color:var(--amber);font-family:var(--mono)">→ ${actions.join("<br>→ ")}</div>` : ""}
+    <div class="card-time">${email.received_time || ""}</div>`;
+        container.appendChild(card);
+      }
+
+      // ── Source Providers ─────────────────────────────────────────────────────────
+      let _currentSearchTask = "";
+      let _currentProvider = null;
+
+      document
+        .getElementById("searchInput")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            runSearch();
+          }
+        });
+
+      async function runSearch() {
+        const input = document.getElementById("searchInput");
+        const task = input.value.trim();
+        const n = parseInt(document.getElementById("searchN").value) || 5;
+        const btn = document.getElementById("searchBtn");
+        const status = document.getElementById("searchStatus");
+        const logEl = document.getElementById("searchLog");
+        const meta = document.getElementById("searchMeta");
+        const cards = document.getElementById("providerCards");
+
+        if (!task) return;
+        _currentSearchTask = task;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span>';
+        status.style.display = "block";
+        meta.style.display = "none";
+        logEl.innerHTML = "";
+        cards.innerHTML = "";
+
+        log(logEl, `→ Searching for: ${task}`, "line-info");
+        log(logEl, `  Finding up to ${n} providers…`, "line-muted");
+        log(logEl, `  Generating search query…`, "line-muted");
+
+        try {
+          const res = await fetch(`${API}/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ task, n }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            log(logEl, `✗ ${data.error}`, "line-err");
+            return;
+          }
+
+          log(logEl, `✓ Query used: "${data.query}"`, "line-ok");
+          log(logEl, `✓ Found ${data.total_found} provider(s)`, "line-ok");
+
+          const withContact = data.providers.filter(
+            (p) => p.emails.length || p.phones.length,
+          );
+          const withoutContact = data.providers.filter(
+            (p) => !p.emails.length && !p.phones.length,
+          );
+          log(
+            logEl,
+            `  ${withContact.length} with contact details, ${withoutContact.length} without`,
+            "line-muted",
+          );
+
+          document.getElementById("searchMetaText").textContent =
+            `${data.provider_type} · ${data.total_found} result(s) · query: "${data.query}"`;
+          meta.style.display = "block";
+
+          for (const p of data.providers) renderProviderCard(cards, p);
+        } catch (err) {
+          log(logEl, `✗ Request failed: ${err.message}`, "line-err");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Search";
+        }
+      }
+
+      function renderProviderCard(container, provider) {
+        const emailList = provider.emails.length
+          ? provider.emails
+              .map(
+                (e) =>
+                  `<div class="contact-item"><span class="ci-icon">✉</span><span class="ci-val">${e}</span></div>`,
+              )
+              .join("")
+          : `<div class="contact-item"><span class="ci-none">No email found</span></div>`;
+
+        const phoneList = provider.phones.length
+          ? provider.phones
+              .slice(0, 2)
+              .map(
+                (p) =>
+                  `<div class="contact-item"><span class="ci-icon">✆</span><span class="ci-val">${p}</span></div>`,
+              )
+              .join("")
+          : "";
+
+        const hasContact = provider.emails.length > 0;
+
+        const card = document.createElement("div");
+        card.className = "provider-card";
+        card.innerHTML = `
+    <div>
+      <div class="provider-name">${provider.name || "Unknown"}</div>
+      <a class="provider-url" href="${provider.url}" target="_blank" rel="noopener">${provider.url}</a>
+    </div>
+    ${provider.snippet ? `<div class="provider-snippet">${provider.snippet.slice(0, 160)}</div>` : ""}
+    <div class="contact-row">
+      ${emailList}
+      ${phoneList}
+    </div>
+    <div class="provider-actions">
+      <button class="btn-primary" style="font-size:12px;padding:8px 14px"
+        onclick='openDraftModal(${JSON.stringify(provider).replace(/'/g, "&#39;")})'>
+        ✉ Draft Email
+      </button>
+      <a href="${provider.url}" target="_blank" rel="noopener"
+        style="font-size:12px;padding:8px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;text-decoration:none;display:flex;align-items:center">
+        ↗ Visit
+      </a>
+    </div>`;
+        container.appendChild(card);
+      }
+
+      // ── Draft modal ───────────────────────────────────────────────────────────────
+      async function openDraftModal(provider) {
+        _currentProvider = provider;
+
+        // Show modal with loading state
+        document.getElementById("draftModal").classList.add("open");
+        document.getElementById("draftTo").value = provider.emails[0] || "";
+        document.getElementById("draftSubject").value = "";
+        document.getElementById("draftBody").value = "Drafting…";
+        document.getElementById("draftContext").value = "";
+        document.getElementById("sendDraftBtn").disabled = true;
+        document.getElementById("redraftBtn").disabled = true;
+
+        await _fetchDraft();
+      }
+
+      async function _fetchDraft() {
+        const context = document.getElementById("draftContext").value.trim();
+        try {
+          const res = await fetch(`${API}/search/draft`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: _currentProvider,
+              task: _currentSearchTask,
+              context,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            document.getElementById("draftBody").value = `Error: ${data.error}`;
+            return;
+          }
+
+          if (!document.getElementById("draftTo").value && data.to)
+            document.getElementById("draftTo").value = data.to;
+          document.getElementById("draftSubject").value = data.subject || "";
+          document.getElementById("draftBody").value = data.body || "";
+        } catch (err) {
+          document.getElementById("draftBody").value =
+            `Request failed: ${err.message}`;
+        } finally {
+          document.getElementById("sendDraftBtn").disabled = false;
+          document.getElementById("redraftBtn").disabled = false;
+        }
+      }
+
+      async function redraftEmail() {
+        document.getElementById("draftBody").value = "Redrafting…";
+        document.getElementById("sendDraftBtn").disabled = true;
+        document.getElementById("redraftBtn").disabled = true;
+        await _fetchDraft();
+      }
+
+      async function sendDraftEmail() {
+        const email = {
+          to: document.getElementById("draftTo").value.trim(),
+          subject: document.getElementById("draftSubject").value.trim(),
+          body: document.getElementById("draftBody").value.trim(),
+        };
+
+        if (!email.to || !email.subject || !email.body) {
+          alert("To, Subject, and Body are all required before sending.");
+          return;
+        }
+
+        const btn = document.getElementById("sendDraftBtn");
+        btn.disabled = true;
+        btn.textContent = "Sending…";
+
+        try {
+          const res = await fetch(`${API}/search/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+
+          if (data.sent) {
+            closeDraftModal();
+            // Brief confirmation in the search log
+            const logEl = document.getElementById("searchLog");
+            if (logEl)
+              log(logEl, `✓ Outreach email sent to ${email.to}`, "line-ok");
+          } else {
+            alert("Failed to send — check that Outlook is running.");
+          }
+        } catch (err) {
+          alert(`Send failed: ${err.message}`);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Send via Outlook";
+        }
+      }
+
+      function closeDraftModal() {
+        document.getElementById("draftModal").classList.remove("open");
+        _currentProvider = null;
+      }
+
+      // Close modal on overlay click
+      document.getElementById("draftModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("draftModal"))
+          closeDraftModal();
+      });
+
+      // ── Negotiations ─────────────────────────────────────────────────────────────
+
+      async function loadNegotiations() {
+        const el = document.getElementById("negTable");
+        el.innerHTML = `<div class="empty"><span class="spin"></span> Loading…</div>`;
+
+        try {
+          const res = await fetch(`${API}/negotiations`);
+          const data = await res.json();
+          const list = data.negotiations || [];
+
+          if (!list.length) {
+            el.innerHTML = `<div class="empty">No negotiation threads yet. Start the monitor and send a meeting request.</div>`;
+            return;
+          }
+
+          el.innerHTML = `
+      <table class="neg-table">
+        <thead><tr>
+          <th>Thread</th><th>Title</th><th>Status</th>
+          <th>Rounds</th><th>Initiator</th><th>History</th>
+        </tr></thead>
+        <tbody id="negBody"></tbody>
+      </table>`;
+
+          const tbody = document.getElementById("negBody");
+          for (const neg of list) {
+            const histLines = (neg.history || [])
+              .map((h) => {
+                if (h.action === "confirmed")
+                  return `✓ Round ${h.round}: confirmed ${h.slot?.date} ${h.slot?.time}`;
+                if (h.action === "counter_proposal")
+                  return `↔ Round ${h.round}: offered ${(h.slots_offered || []).length} slot(s)`;
+                if (h.action === "failed") return `✗ Failed: ${h.reason}`;
+                return `  Round ${h.round}: ${h.action}`;
+              })
+              .join("\n");
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:140px;word-break:break-all">${neg.thread_id}</td>
+        <td style="font-weight:500">${neg.title}</td>
+        <td><span class="neg-status ${neg.status}">${neg.status}</span></td>
+        <td style="font-family:var(--mono);text-align:center">${neg.rounds}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${neg.initiator}</td>
+        <td><div class="neg-history">${histLines || "—"}</div></td>`;
+            tbody.appendChild(tr);
+          }
+        } catch (err) {
+          el.innerHTML = `<div class="empty">Error: ${err.message}</div>`;
+        }
+      }
+
+      // Set today's date as default for sim date input
+      (function () {
+        const d = new Date();
+        const tomorrow = new Date(d.setDate(d.getDate() + 1));
+        const iso = tomorrow.toISOString().split("T")[0];
+        const el = document.getElementById("simDate");
+        if (el) el.value = iso;
+      })();
+
+      async function runSimulation() {
+        const btn = document.getElementById("simBtn");
+        const result = document.getElementById("simResult");
+        const outcome = document.getElementById("simOutcomeLine");
+        const trans = document.getElementById("simTranscript");
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span> Running…';
+        result.style.display = "none";
+
+        const date = document.getElementById("simDate").value;
+        const time = document.getElementById("simTime").value;
+        const payload = {
+          title:
+            document.getElementById("simTitle").value.trim() || "Project Sync",
+          duration:
+            parseInt(document.getElementById("simDuration").value) || 60,
+          max_rounds:
+            parseInt(document.getElementById("simMaxRounds").value) || 8,
+          initial_slots: date && time ? [{ date, time }] : null,
+        };
+
+        try {
+          const res = await fetch(`${API}/negotiations/simulate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+
+          const actionClass = {
+            confirmed: "t-confirmed",
+            counter_proposal: "t-counter",
+            rejected: "t-rejected",
+            failed: "t-failed",
+          };
+
+          const slotStr = data.slot
+            ? `${data.slot.date} at ${data.slot.time}`
+            : "no slot booked";
+          outcome.textContent = `Outcome: ${data.outcome} · ${data.rounds} round(s) · ${slotStr}`;
+
+          trans.innerHTML = (data.transcript || [])
+            .map((step) => {
+              const cls = actionClass[step.action] || "";
+              const slot = step.slot
+                ? ` — ${step.slot.date} at ${step.slot.time}`
+                : "";
+              return `<div class="transcript-step">
+        <div class="t-round">Round ${step.round}</div>
+        <div class="t-body">
+          <strong>${step.sender}</strong> → ${step.receiver}
+          <span class="t-action ${cls}">${step.action}</span>${slot}
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px">${step.subject}</div>
+        </div>
+      </div>`;
+            })
+            .join("");
+
+          result.style.display = "block";
+          loadNegotiations();
+        } catch (err) {
+          outcome.textContent = `Error: ${err.message}`;
+          result.style.display = "block";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "▶ Run Simulation";
+        }
+      }
+
+      // ── Blacklist ─────────────────────────────────────────────────────────────────
+      let _localBlacklist = new Set();
+
+      async function loadBlacklist() {
+        try {
+          const res = await fetch(`${API}/blacklist`);
+          const data = await res.json();
+          _localBlacklist = new Set(
+            (data.blacklist || []).map((a) => a.toLowerCase()),
+          );
+          renderBlacklist(data.blacklist || []);
+        } catch (err) {
+          document.getElementById("blList").innerHTML =
+            `<div class="bl-empty">Error loading blacklist: ${err.message}</div>`;
+        }
+      }
+
+      function renderBlacklist(list) {
+        const el = document.getElementById("blList");
+        const count = document.getElementById("blCount");
+        count.textContent = `${list.length} address${list.length !== 1 ? "es" : ""}`;
+
+        if (!list.length) {
+          el.innerHTML = `<div class="bl-empty">No addresses blocked yet.</div>`;
+          return;
+        }
+        el.innerHTML = list
+          .map(
+            (addr) => `
+    <div class="bl-row">
+      <span class="bl-addr">${addr}</span>
+      <button class="bl-remove" title="Unblock" onclick="blacklistRemove('${addr}')">✕</button>
+    </div>`,
+          )
+          .join("");
+      }
+
+      async function blacklistAdd() {
+        const input = document.getElementById("blInput");
+        const addr = input.value.trim().toLowerCase();
+        if (!addr) return;
+
+        try {
+          const res = await fetch(`${API}/blacklist/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: addr }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            alert(data.error);
+            return;
+          }
+          _localBlacklist = new Set(data.blacklist.map((a) => a.toLowerCase()));
+          renderBlacklist(data.blacklist);
+          input.value = "";
+          // Update any visible inbox card for this address
+          _updateCardBlockState(addr, true);
+        } catch (err) {
+          alert(`Failed to add: ${err.message}`);
+        }
+      }
+
+      async function blacklistRemove(addr) {
+        try {
+          const res = await fetch(`${API}/blacklist/remove`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: addr }),
+          });
+          const data = await res.json();
+          _localBlacklist = new Set(data.blacklist.map((a) => a.toLowerCase()));
+          renderBlacklist(data.blacklist);
+          _updateCardBlockState(addr, false);
+        } catch (err) {
+          alert(`Failed to remove: ${err.message}`);
+        }
+      }
+
+      async function quickBlock(addr, btn) {
+        btn.disabled = true;
+        btn.textContent = "…";
+        try {
+          const res = await fetch(`${API}/blacklist/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: addr }),
+          });
+          const data = await res.json();
+          _localBlacklist = new Set(data.blacklist.map((a) => a.toLowerCase()));
+          _updateCardBlockState(addr, true);
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "⊘ Block";
+          alert(`Failed: ${err.message}`);
+        }
+      }
+
+      function _updateCardBlockState(addr, blocked) {
+        document
+          .querySelectorAll(`.card[data-email-addr="${addr}"] .btn-block`)
+          .forEach((btn) => {
+            btn.textContent = blocked ? "Blocked" : "⊘ Block";
+            btn.disabled = blocked;
+            btn.classList.toggle("blocked", blocked);
+          });
+      }
+
+      document.getElementById("blInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") blacklistAdd();
+      });
+
+      // ── Monitor ───────────────────────────────────────────────────────────────────
+      async function monitorStart() {
+        const out = document.getElementById("monitorOutput");
+        try {
+          const res = await fetch(`${API}/monitor/start`, { method: "POST" });
+          const data = await res.json();
+          log(
+            out,
+            data.status === "started"
+              ? "✓ Monitor started."
+              : "⚠ Already running.",
+            data.status === "started" ? "line-ok" : "line-info",
+          );
+          startPollingStatus();
+        } catch (err) {
+          log(out, `✗ ${err.message}`, "line-err");
+        }
+      }
+
+      async function monitorStop() {
+        const out = document.getElementById("monitorOutput");
+        log(out, "Stopping monitor…", "line-info");
+        try {
+          const res = await fetch(`${API}/monitor/stop`, { method: "POST" });
+          const data = await res.json();
+          stopPollingStatus();
+          updateMonitorUI(false, 0);
+          log(out, "✓ Monitor stopped.", "line-ok");
+
+          if (data.summary) {
+            renderSessionSummary(data.summary);
+            log(
+              out,
+              "✓ Session summary generated — see Session Log tab.",
+              "line-ok",
+            );
+          } else {
+            log(out, "No emails processed this session.", "line-muted");
+          }
+        } catch (err) {
+          log(out, `✗ ${err.message}`, "line-err");
+        }
+      }
+
+      async function monitorPoll() {
+        const out = document.getElementById("monitorOutput");
+        log(out, "↻ Manual poll triggered…", "line-info");
+        try {
+          const res = await fetch(`${API}/monitor/poll`, { method: "POST" });
+          const data = await res.json();
+          log(out, `✓ Processed ${data.processed} email(s).`, "line-ok");
+          for (const r of data.results || []) {
+            log(out, `  [${r.status}] ${r.email?.from} — ${r.email?.subject}`);
+          }
+          refreshMonitorStatus();
+        } catch (err) {
+          log(out, `✗ ${err.message}`, "line-err");
+        }
+      }
+
+      async function refreshMonitorStatus() {
+        try {
+          const res = await fetch(`${API}/monitor/status`);
+          const data = await res.json();
+          updateMonitorUI(data.running, data.emails_processed);
+          if (data.running && !monitorInterval) startPollingStatus();
+          if (!data.running) stopPollingStatus();
+        } catch (_) {}
+      }
+
+      function updateMonitorUI(running, count) {
+        document.getElementById("statStatus").textContent = running
+          ? "ON"
+          : "OFF";
+        document.getElementById("statStatus").style.color = running
+          ? "var(--green)"
+          : "var(--muted)";
+        document.getElementById("statCount").textContent = count;
+        document
+          .getElementById("monitorDot")
+          .classList.toggle("active", running);
+        document.getElementById("monitorLabel").textContent = running
+          ? "Monitor running"
+          : "Monitor off";
+      }
+
+      function startPollingStatus() {
+        if (monitorInterval) return;
+        monitorInterval = setInterval(refreshMonitorStatus, 5000);
+      }
+      function stopPollingStatus() {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+      }
+
+      // ── Session Summary ───────────────────────────────────────────────────────────
+      function renderSessionSummary(summary) {
+        const el = document.getElementById("sessionContent");
+        el.innerHTML = "";
+
+        const overview = document.createElement("div");
+        overview.className = "summary-section";
+        overview.innerHTML = `<div class="summary-title">Overview</div><div class="summary-item">${summary.session_overview || ""}</div>`;
+        el.appendChild(overview);
+
+        const sections = [
+          {
+            key: "meetings_booked",
+            title: "Meetings Booked",
+            render: (m) =>
+              `<strong>${m.title}</strong> with ${m.with} on ${m.date} at ${m.time}`,
+          },
+          {
+            key: "meetings_declined",
+            title: "Meetings Declined",
+            render: (m) =>
+              `<strong>${m.title}</strong> on ${m.date} — conflict. Alternatives: ${(m.alternatives_offered || []).join(", ") || "none"}`,
+          },
+          {
+            key: "clarifications_requested",
+            title: "Clarifications Requested",
+            render: (m) => `${m.from} — ${m.subject}`,
+          },
+          {
+            key: "non_meeting_emails",
+            title: "Other Emails",
+            render: (m) =>
+              `${m.from} — ${m.subject}${m.summary ? ": " + m.summary : ""}`,
+          },
+          {
+            key: "attention_needed",
+            title: "Needs Attention",
+            render: (m) => m,
+          },
+        ];
+
+        for (const { key, title, render } of sections) {
+          const items = summary[key] || [];
+          if (!items.length) continue;
+          const sec = document.createElement("div");
+          sec.className = "summary-section";
+          sec.innerHTML = `<div class="summary-title">${title} (${items.length})</div>
+      ${items.map((m) => `<div class="summary-item">${render(m)}</div>`).join("")}`;
+          el.appendChild(sec);
+        }
+
+        // Switch to session tab
+        document.querySelectorAll(".nav-item").forEach((n) => {
+          n.classList.toggle("active", n.dataset.panel === "session");
+        });
+        document.querySelectorAll(".panel").forEach((p) => {
+          p.classList.toggle("active", p.id === "panel-session");
+        });
+      }
+
+      // ── Init ──────────────────────────────────────────────────────────────────────
+      refreshMonitorStatus();
+      loadBlacklist();
+    </script>
+  </body>
+</html>
