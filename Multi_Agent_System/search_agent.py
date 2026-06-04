@@ -1,3 +1,17 @@
+"""
+search_agent.py
+
+Given a natural-language task description (e.g. "find painters to paint the office"),
+this agent:
+  1. Uses DuckDuckGo to search for local/relevant service providers
+  2. Scrapes each result page for contact details (email, phone, address)
+  3. Returns structured provider cards
+  4. Can draft a formal outreach email to any selected provider
+
+Dependencies:
+    pip install duckduckgo-search requests beautifulsoup4 lxml
+"""
+
 import re
 import time
 import json
@@ -6,6 +20,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from ollama_client import ask_llm_chat, ask_llm
 from utils import safe_parse_json
+
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 REQUEST_TIMEOUT  = 8      # seconds per HTTP request
 MAX_SCRAPE_PAGES = 2      # how many internal pages to follow (e.g. /contact)
@@ -20,18 +36,22 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-
+# Patterns for contact detail extraction
 EMAIL_RE   = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 PHONE_RE   = re.compile(
     r"(\+?1[\s\-.]?)?"
     r"(\(?\d{3}\)?[\s\-.]?)"
     r"\d{3}[\s\-.]?\d{4}"
 )
+
+# Pages that are likely to have contact info
 CONTACT_PAGE_HINTS = [
     "contact", "contact-us", "contactus", "get-in-touch",
     "about", "about-us", "reach-us", "enquiry", "enquiries",
 ]
 
+
+# ── Query generation ──────────────────────────────────────────────────────────
 
 QUERY_SYSTEM = """You are a search query generator for finding business service providers.
 Output JSON only. No explanation.
@@ -56,10 +76,20 @@ def _generate_search_query(task: str) -> dict:
         return {"query": task + " services hire", "provider_type": "service providers"}
     return result
 
+
+# ── Web search ────────────────────────────────────────────────────────────────
+
 def _ddg_search(query: str, max_results: int) -> list[dict]:
-    
+    """
+    Search DuckDuckGo and return a list of {title, url, snippet} dicts.
+    Supports both the old duckduckgo_search package and the renamed ddgs package.
+    """
     try:
-        from duckduckgo_search import DDGS
+        # Try new package name first (pip install ddgs)
+        
+        from ddgs import DDGS
+        
+
         results = []
         with DDGS() as ddg:
             for r in ddg.text(query, max_results=max_results * 2):
@@ -70,12 +100,14 @@ def _ddg_search(query: str, max_results: int) -> list[dict]:
                 })
         return results
     except ImportError:
-        print("[search] duckduckgo-search not installed. Run: pip install duckduckgo-search")
+        print("[search] Search package not installed. Run: pip install ddgs")
         return []
     except Exception as e:
         print(f"[search] DDG search error: {e}")
         return []
 
+
+# ── Scraper ───────────────────────────────────────────────────────────────────
 
 def _fetch_html(url: str) -> str | None:
     try:
@@ -88,9 +120,11 @@ def _fetch_html(url: str) -> str | None:
 
 
 def _extract_emails(html: str, base_url: str) -> set[str]:
+    """Extract email addresses from HTML text and mailto links."""
     soup   = BeautifulSoup(html, "lxml")
     emails = set()
 
+    # mailto: hrefs
     for tag in soup.find_all("a", href=True):
         href = tag["href"]
         if href.lower().startswith("mailto:"):
@@ -98,9 +132,11 @@ def _extract_emails(html: str, base_url: str) -> set[str]:
             if EMAIL_RE.match(addr):
                 emails.add(addr.lower())
 
+    # Raw text scan
     for match in EMAIL_RE.findall(soup.get_text()):
         emails.add(match.lower())
 
+    # Filter out obvious non-emails (image filenames, etc.)
     emails = {e for e in emails if "." in e.split("@")[-1] and len(e) < 80}
     return emails
 
@@ -125,7 +161,7 @@ def _extract_phones(html: str) -> set[str]:
 
 
 def _find_contact_page_url(html: str, base_url: str) -> str | None:
-
+    """Try to find the URL of a /contact or /about page."""
     soup = BeautifulSoup(html, "lxml")
     for tag in soup.find_all("a", href=True):
         href = tag["href"].lower().rstrip("/")
@@ -137,9 +173,11 @@ def _find_contact_page_url(html: str, base_url: str) -> str | None:
 
 def _extract_business_name(html: str, fallback_title: str) -> str:
     soup = BeautifulSoup(html, "lxml")
+    # Try og:site_name first
     og = soup.find("meta", property="og:site_name")
     if og and og.get("content", "").strip():
         return og["content"].strip()
+    # Then <title>
     if soup.title and soup.title.string:
         raw = soup.title.string.strip()
         # Strip common suffixes like "| Home", "- Official Site"
@@ -150,7 +188,10 @@ def _extract_business_name(html: str, fallback_title: str) -> str:
 
 
 def scrape_provider(url: str, title: str) -> dict:
-
+    """
+    Scrape a single URL for contact details.
+    Returns a provider dict with name, url, emails, phones, scraped_from.
+    """
     provider = {
         "name":         title,
         "url":          url,
@@ -160,6 +201,7 @@ def scrape_provider(url: str, title: str) -> dict:
         "snippet":      "",
     }
 
+    # Fetch homepage
     html = _fetch_html(url)
     if not html:
         return provider
@@ -169,6 +211,7 @@ def scrape_provider(url: str, title: str) -> dict:
     phones  = _extract_phones(html)
     provider["scraped_from"].append(url)
 
+    # If homepage yielded nothing, try the contact page
     if not emails and not phones:
         contact_url = _find_contact_page_url(html, url)
         if contact_url and contact_url != url:
@@ -182,6 +225,10 @@ def scrape_provider(url: str, title: str) -> dict:
     provider["phones"] = sorted(phones)
     return provider
 
+
+# ── Result filtering ──────────────────────────────────────────────────────────
+
+# Domains to skip (aggregators, social media, job boards — not actual providers)
 _SKIP_DOMAINS = {
     "facebook.com", "instagram.com", "twitter.com", "x.com",
     "linkedin.com", "youtube.com", "yelp.com", "tripadvisor.com",
@@ -198,6 +245,9 @@ def _is_skippable(url: str) -> bool:
     except Exception:
         return False
 
+
+# ── Outreach email drafting ───────────────────────────────────────────────────
+
 OUTREACH_SYSTEM = """You are a professional business email writer.
 Write a formal outreach email on behalf of a business seeking a service provider.
 Output JSON only. No explanation.
@@ -211,7 +261,10 @@ Rules:
 
 
 def draft_outreach_email(provider: dict, task_description: str, extra_context: str = "") -> dict:
-
+    """
+    Draft a formal outreach email to a provider for a given task.
+    Returns {subject, body, to} or {error}.
+    """
     to_email = provider["emails"][0] if provider.get("emails") else ""
 
     user_msg = (
@@ -235,6 +288,9 @@ def draft_outreach_email(provider: dict, task_description: str, extra_context: s
 
     return result
 
+
+# ── Main entry point ──────────────────────────────────────────────────────────
+
 def search_agent(task: str, n: int = DEFAULT_N) -> dict:
     """
     Full pipeline: generate query → search → scrape → return provider list.
@@ -250,17 +306,21 @@ def search_agent(task: str, n: int = DEFAULT_N) -> dict:
     """
     print(f"[search] Task: {task!r}")
 
+    # 1. Generate a focused search query
     query_info    = _generate_search_query(task)
     query         = query_info["query"]
     provider_type = query_info.get("provider_type", "service providers")
     print(f"[search] Query: {query!r}  |  Type: {provider_type}")
 
+    # 2. Search DuckDuckGo
     raw_results = _ddg_search(query, max_results=n * 3)
     print(f"[search] Raw results: {len(raw_results)}")
 
+    # 3. Filter out aggregator/social sites
     filtered = [r for r in raw_results if r["url"] and not _is_skippable(r["url"])]
     print(f"[search] After filtering: {len(filtered)}")
 
+    # 4. Scrape each result — stop once we have n providers
     providers = []
     seen_domains = set()
 
@@ -274,6 +334,7 @@ def search_agent(task: str, n: int = DEFAULT_N) -> dict:
         except Exception:
             continue
 
+        # Skip duplicate domains
         if domain in seen_domains:
             continue
         seen_domains.add(domain)
@@ -282,6 +343,7 @@ def search_agent(task: str, n: int = DEFAULT_N) -> dict:
         provider          = scrape_provider(url, result["title"])
         provider["snippet"] = result.get("snippet", "")
 
+        # Only include if we got at least a name and URL
         if provider["name"] or provider["url"]:
             providers.append(provider)
 

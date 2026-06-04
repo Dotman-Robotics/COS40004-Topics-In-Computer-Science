@@ -1,3 +1,5 @@
+import threading
+import uuid
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -9,7 +11,6 @@ CSV_PATH        = "sample-data.csv"
 DB_LOCATION     = "./chroma_langchain_db"
 COLLECTION_NAME = "email_addresses"
 CANDIDATE_K     = 5
-
 
 embeddings = OllamaEmbeddings(model="mxbai-embed-large")
 
@@ -30,7 +31,6 @@ def _seed_database():
         print(f"[vector] Count check failed ({e}), proceeding with seed.")
 
     print("[vector] DB is empty — seeding from CSV...")
-
     try:
         df = pd.read_csv(CSV_PATH)
     except FileNotFoundError:
@@ -43,15 +43,13 @@ def _seed_database():
         first = str(row.get("first name", "")).strip()
         last  = str(row.get("last name",  "")).strip()
         email = str(row.get("email",      "")).strip()
-
         if not email or email == "nan":
             continue
-
         documents.append(Document(
             page_content=f"{first} {last} {email}",
             metadata={
-                "state":      str(row.get("state",      "")),
-                "birthdate":  str(row.get("birthdate",  "")),
+                "state":      str(row.get("state",     "")),
+                "birthdate":  str(row.get("birthdate", "")),
                 "first_name": first,
                 "last_name":  last,
             },
@@ -60,11 +58,11 @@ def _seed_database():
         ids.append(str(i))
 
     if not documents:
-        print("[vector] WARNING: No valid contacts found. Check CSV column names.")
+        print("[vector] WARNING: No valid contacts found.")
         return
 
     vector_store.add_documents(documents=documents, ids=ids)
-    print(f"[vector] Seeded {len(documents)} contacts. DB count: {vector_store._collection.count()}")
+    print(f"[vector] Seeded {len(documents)} contacts.")
 
 
 _seed_database()
@@ -90,22 +88,82 @@ def _cosine_rank_candidates(query: str, candidates: list) -> list:
     except ValueError:
         scores = [1.0] * len(candidates)
 
-    ranked = sorted(
+    return sorted(
         zip(scores, candidates, names),
         key=lambda x: x[0],
         reverse=True,
     )
-    return ranked
 
 
-def _confirm_contact(name: str, email: str) -> bool:
-    while True:
-        answer = input(f"  Did you mean {name} <{email}>? (y/n): ").strip().lower()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
+# ── GUI confirmation queue ────────────────────────────────────────────────────
+# Replaces the blocking input() call. When the GUI sends a command that needs
+# contact confirmation, find_email() creates a pending request here and waits.
+# The Flask API resolves it when the user clicks confirm/reject in the modal.
+
+_pending_lock         = threading.Lock()
+_pending_confirmations: dict[str, dict] = {}
+# { token: { candidates:[{name,email,score}], event: threading.Event,
+#            answer: int|None } }
+
+
+def create_confirmation_request(candidates: list) -> str:
+    """
+    Register a confirmation request and return a token the GUI can poll.
+    candidates: list of (score, doc, name) tuples from _cosine_rank_candidates
+    """
+    token = str(uuid.uuid4())
+    items = []
+    for score, doc, name in candidates:
+        parts = doc.page_content.split()
+        if len(parts) >= 2:
+            items.append({
+                "name":  name,
+                "email": parts[-1],
+                "score": round(float(score), 3),
+            })
+
+    event = threading.Event()
+    with _pending_lock:
+        _pending_confirmations[token] = {
+            "candidates": items,
+            "event":      event,
+            "answer":     None,   # index into candidates, or -1 for none
+        }
+    return token
+
+
+def get_pending_confirmation(token: str) -> dict | None:
+    """Return the pending request data for a token (for the GUI to display)."""
+    with _pending_lock:
+        req = _pending_confirmations.get(token)
+        if not req:
+            return None
+        return {"token": token, "candidates": req["candidates"]}
+
+
+def resolve_confirmation(token: str, index: int) -> bool:
+    """
+    Resolve a pending confirmation.
+    index = 0-based index into candidates list, or -1 for 'none of these'.
+    Returns False if the token doesn't exist.
+    """
+    with _pending_lock:
+        req = _pending_confirmations.get(token)
+        if not req:
             return False
-        print("  Please enter y or n.")
+        req["answer"] = index
+        req["event"].set()
+    return True
+
+
+def get_all_pending() -> list[dict]:
+    """Return all unresolved confirmation requests (for GUI polling)."""
+    with _pending_lock:
+        return [
+            {"token": t, "candidates": v["candidates"]}
+            for t, v in _pending_confirmations.items()
+            if not v["event"].is_set()
+        ]
 
 
 def find_email(query: str, interactive: bool = True) -> dict | None:
@@ -119,6 +177,7 @@ def find_email(query: str, interactive: bool = True) -> dict | None:
 
     ranked = _cosine_rank_candidates(query.strip(), candidates)
 
+    # Non-interactive: return top result immediately (used by planner, search)
     if not interactive:
         score, doc, name = ranked[0]
         parts = doc.page_content.split()
@@ -127,28 +186,40 @@ def find_email(query: str, interactive: bool = True) -> dict | None:
         return {
             "name":     " ".join(parts[:-1]),
             "email":    parts[-1],
+            "score":    round(float(score), 3),
             "metadata": doc.metadata,
         }
 
-    print(f"\n[vector] Found {len(ranked)} candidate(s) for '{query}':")
-    for i, (score, doc, name) in enumerate(ranked):
-        parts = doc.page_content.split()
-        if len(parts) < 2:
-            continue
-        email = parts[-1]
+    # Interactive: use GUI confirmation queue instead of input()
+    token = create_confirmation_request(ranked)
+    print(f"[vector] Contact confirmation required — token: {token}")
+    print(f"[vector] Waiting for GUI response…")
 
-        confirmed = _confirm_contact(name, email)
-        if confirmed:
-            print(f"  Confirmed: {name} <{email}>")
-            return {
-                "name":     name,
-                "email":    email,
-                "metadata": doc.metadata,
-            }
-        else:
-            if i < len(ranked) - 1:
-                print("  Trying next candidate...")
-            else:
-                print("  No more candidates. Contact not found.")
+    with _pending_lock:
+        event = _pending_confirmations[token]["event"]
 
-    return None
+    # Block until the GUI resolves it (timeout 120s)
+    resolved = event.wait(timeout=120)
+
+    with _pending_lock:
+        req = _pending_confirmations.pop(token, {})
+
+    if not resolved or req.get("answer") is None or req["answer"] == -1:
+        print(f"[vector] Confirmation timed out or rejected.")
+        return None
+
+    idx = req["answer"]
+    if idx < 0 or idx >= len(ranked):
+        return None
+
+    score, doc, name = ranked[idx]
+    parts = doc.page_content.split()
+    if len(parts) < 2:
+        return None
+
+    return {
+        "name":     name,
+        "email":    parts[-1],
+        "score":    round(float(score), 3),
+        "metadata": doc.metadata,
+    }

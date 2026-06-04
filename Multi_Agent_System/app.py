@@ -6,16 +6,17 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 from planner_agent import planner_agent
-from email_agent import email_agent, send_outlook_email, read_outlook_emails, display_inbox
+from email_agent import compose_email, send_outlook_email, read_outlook_emails, display_inbox
 from calendar_agent import calendar_agent
 from search_agent import search_agent, draft_outreach_email
+from vector import get_all_pending, get_pending_confirmation, resolve_confirmation
 from email_monitor import (
     start_monitor, stop_monitor, is_running,
     poll_inbox, get_session_log,
     add_to_blacklist, remove_from_blacklist, get_blacklist,
 )
 from email_summarizer import summarize_monitor_session
-from negotiation_agent import get_all_negotiations, simulate_negotiation
+from negotiation_agent import get_all_negotiations, simulate_negotiation, purge_active_negotiations
 
 # Resolve GUI folder relative to this file so it works regardless of cwd
 _BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -49,9 +50,9 @@ def run_agent():
         result_entry = {"type": action_type, "input": action_input, "output": None}
 
         if action_type == "email":
-            email_result = email_agent(action_input, context=user_input)
+            email_result = compose_email(action_input, context=user_input)
             if not email_result.get("error"):
-                send_outlook_email(email_result, sender_account="zoomertron@outlook.com")
+                send_outlook_email(email_result, sender_account=os.environ.get("AGENT_ACCOUNT", "zoomertron@outlook.com"))
             result_entry["output"] = email_result
 
         elif action_type == "calendar":
@@ -183,7 +184,7 @@ def search_send():
     email = data.get("email")
     if not email or not all(k in email for k in ("to", "subject", "body")):
         return jsonify({"error": "email with to/subject/body required."}), 400
-    result = send_outlook_email(email, sender_account="zoomertron@outlook.com")
+    result = send_outlook_email(email, sender_account=os.environ.get("AGENT_ACCOUNT", "zoomertron@outlook.com"))
     return jsonify({"sent": result is not None, "email": email})
 
 
@@ -214,6 +215,27 @@ def blacklist_remove():
     return jsonify({"removed": removed, "address": address.lower(), "blacklist": get_blacklist()})
 
 
+# ── Contact confirmation endpoints ────────────────────────────────────────────
+
+@app.route("/api/confirm/pending", methods=["GET"])
+def confirm_pending():
+    """Return all unresolved contact confirmation requests."""
+    return jsonify({"pending": get_all_pending()})
+
+
+@app.route("/api/confirm/resolve", methods=["POST"])
+def confirm_resolve():
+    """
+    Resolve a contact confirmation.
+    Body: { token: str, index: int }  (index -1 = none of these)
+    """
+    data  = request.get_json(force=True)
+    token = data.get("token", "")
+    index = int(data.get("index", -1))
+    ok    = resolve_confirmation(token, index)
+    return jsonify({"resolved": ok, "token": token, "index": index})
+
+
 # ── Negotiation endpoints ─────────────────────────────────────────────────────
 
 @app.route("/api/negotiations", methods=["GET"])
@@ -234,6 +256,13 @@ def negotiations_get():
         })
     threads.sort(key=lambda x: x["created_at"], reverse=True)
     return jsonify({"negotiations": threads, "count": len(threads)})
+
+
+@app.route("/api/negotiations/purge", methods=["POST"])
+def negotiations_purge():
+    """Manually purge all stale active negotiations and cancel their tentative calendar entries."""
+    purged = purge_active_negotiations()
+    return jsonify({"purged": purged})
 
 
 @app.route("/api/negotiations/simulate", methods=["POST"])

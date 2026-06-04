@@ -1,12 +1,17 @@
 import json
+import os
 import win32com.client as win32
 from ollama_client import ask_llm
 from vector import find_email
 from utils import extract_first_json, get_outlook_inbox
 from email_summarizer import summarize_email, summarize_inbox_batch, print_email_summary, print_batch_summary
 
+# Runtime account — resolved at call time so --account CLI arg is always respected
+def _get_account() -> str:
+    return os.environ.get("AGENT_ACCOUNT", "zoomertron@outlook.com")
 
-def email_agent(task_details: str | dict, context: str = "") -> dict:
+
+def compose_email(task_details: str | dict, context: str = "") -> dict:
     """Return {to, subject, body} or {error}."""
 
     if isinstance(task_details, dict) and all(
@@ -85,11 +90,12 @@ def send_outlook_email(email_data: dict, sender_account: str | None = None) -> d
 
 
 def read_outlook_emails(
-    account: str = "zoomertron@outlook.com",
+    account: str | None = None,
     max_emails: int = 5,
     unread_only: bool = True,
     summarize: bool = True,
 ) -> list[dict]:
+    account = account or _get_account()
 
     try:
         inbox = get_outlook_inbox(account)
@@ -147,8 +153,7 @@ def display_inbox(emails: list[dict], batch_summary: bool = True) -> None:
 
 def scan_unread_emails() -> list[dict]:
     try:
-        outlook  = win32.Dispatch("Outlook.Application").GetNamespace("MAPI")
-        inbox    = outlook.GetDefaultFolder(6)
+        inbox    = get_outlook_inbox(_get_account())
         messages = inbox.Items
         messages.Sort("[ReceivedTime]", True)
 
@@ -171,4 +176,3 @@ def scan_unread_emails() -> list[dict]:
     except Exception as e:
         print(f"[email] Failed to open inbox: {e}")
         return []
-    

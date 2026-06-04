@@ -3,8 +3,10 @@ import re
 from ollama_client import ask_llm_chat
 
 
+# ── JSON extraction ───────────────────────────────────────────────────────────
 
 def _extract_first_json(text: str) -> str:
+    # Strip markdown fences if present
     text = re.sub(r"```(?:json)?", "", text).strip()
 
     start = text.find("{")
@@ -28,12 +30,15 @@ def _safe_parse(text: str) -> dict | None:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
+        # Last resort: fix unquoted booleans and retry
         fixed = cleaned.replace(": true", ': true').replace(": false", ': false')
         try:
             return json.loads(fixed)
         except json.JSONDecodeError:
             return None
 
+
+# ── System prompts ────────────────────────────────────────────────────────────
 
 SINGLE_EMAIL_SYSTEM = """You are an email summarizer. Output ONLY a JSON object. No explanation, no markdown, no backticks.
 
@@ -87,6 +92,9 @@ Required output format:
 
 Be specific. Use names, titles, and dates from the log rather than generic placeholders."""
 
+
+# ── Single email summary ──────────────────────────────────────────────────────
+
 def summarize_email(email: dict) -> dict:
     body = (email.get("body") or "").strip()
     if not body:
@@ -107,13 +115,15 @@ def summarize_email(email: dict) -> dict:
         print(f"[summarizer] Failed to parse single-email response:\n{response[:300]}")
         return _fallback_summary(email)
 
+    # Enforce required keys with safe defaults
     result.setdefault("summary",      email.get("subject", "No summary available"))
     result.setdefault("sender",       email.get("from", "Unknown"))
     result.setdefault("category",     "other")
     result.setdefault("action_items", [])
     result.setdefault("priority",     "medium")
 
-    md = result.get("meeting_details") # Enforce meeting_details structure
+    # Enforce meeting_details structure
+    md = result.get("meeting_details")
     if not isinstance(md, dict):
         md = {}
     result["meeting_details"] = {
@@ -123,13 +133,16 @@ def summarize_email(email: dict) -> dict:
         "title":    str(md.get("title", "") or ""),
     }
 
+    # Normalise category
     valid_categories = {"meeting_request", "action_required", "information", "reply_needed", "other"}
     if result["category"] not in valid_categories:
         result["category"] = "other"
 
-    if result["priority"] not in {"high", "medium", "low"}: #priority check
+    # Normalise priority
+    if result["priority"] not in {"high", "medium", "low"}:
         result["priority"] = "medium"
 
+    # Ensure action_items is a list of strings
     if not isinstance(result["action_items"], list):
         result["action_items"] = []
     result["action_items"] = [str(a) for a in result["action_items"] if a]
@@ -147,6 +160,9 @@ def _fallback_summary(email: dict) -> dict:
         "priority":     "medium",
     }
 
+
+# ── Batch inbox summary ───────────────────────────────────────────────────────
+
 def summarize_inbox_batch(emails: list[dict]) -> dict:
     if not emails:
         return {
@@ -155,9 +171,11 @@ def summarize_inbox_batch(emails: list[dict]) -> dict:
             "overview": "No emails to summarize.",
         }
 
+    # Build a pre-summarized list so the batch LLM call gets structured input,
+    # not raw bodies. Each email is summarized individually first if not already done.
     email_entries = ""
     for i, email in enumerate(emails, 1):
-        summary = email.get("summary") or summarize_email(email) 
+        summary = email.get("summary") or summarize_email(email)
         if isinstance(summary, dict):
             summary_text = summary.get("summary", "")
             category     = summary.get("category", "other")
@@ -196,6 +214,7 @@ def summarize_inbox_batch(emails: list[dict]) -> dict:
 
     result["total_emails"] = len(emails)
 
+    # Ensure all digest keys exist
     digest = result.setdefault("digest", {})
     for key in ("meeting_requests", "action_required", "information", "other"):
         digest.setdefault(key, [])
@@ -235,6 +254,9 @@ def _batch_fallback(emails: list[dict]) -> dict:
         "overview":     f"{len(emails)} email(s) processed.",
     }
 
+
+# ── Monitor session summary ───────────────────────────────────────────────────
+
 def summarize_monitor_session(session_log: list[dict]) -> dict:
     if not session_log:
         return {
@@ -260,6 +282,7 @@ def summarize_monitor_session(session_log: list[dict]) -> dict:
             f"Subject: {email.get('subject', '')}\n"
         )
 
+        # Include the per-email summary if available
         if isinstance(summary, dict) and summary.get("summary"):
             log_text += f"Summary: {summary['summary']}\n"
             if summary.get("action_items"):
@@ -273,22 +296,50 @@ def summarize_monitor_session(session_log: list[dict]) -> dict:
             )
 
         if status == "confirmed":
-            cal = entry.get("calendar", {})
-            log_text += f"Outcome: Meeting was booked. Calendar status: {cal.get('outlook_status', '')}\n"
+            cal = entry.get("calendar") or {}
+            neg = entry.get("negotiation") or {}
+            slot = entry.get("slot") or {}
+            if slot:
+                log_text += (
+                    f"Outcome: Meeting confirmed at {slot.get('date','')} "
+                    f"{slot.get('time','')}.\n"
+                )
+            elif cal.get("outlook_status"):
+                log_text += f"Outcome: Meeting was booked. Calendar status: {cal.get('outlook_status', '')}\n"
+            else:
+                log_text += "Outcome: Meeting confirmed.\n"
 
-        elif status == "declined":
+        elif status == "tentative":
+            slot = entry.get("slot") or {}
+            log_text += (
+                f"Outcome: Tentative booking at {slot.get('date','')} "
+                f"{slot.get('time','')} — awaiting confirmation.\n"
+            )
+
+        elif status in ("declined", "counter_proposal"):
             conflicts    = [c.get("title", "") for c in entry.get("conflicts", [])]
             alternatives = entry.get("alternatives", [])
             log_text += (
-                f"Outcome: Declined due to conflict with: {', '.join(conflicts) or 'unknown'}\n"
-                f"Alternatives offered: {', '.join(alternatives) or 'none'}\n"
+                f"Outcome: Could not accommodate — counter-proposed alternatives.\n"
             )
+            if conflicts:
+                log_text += f"Conflicts: {', '.join(conflicts)}\n"
 
         elif status == "clarification_needed":
             log_text += "Outcome: Clarification email sent — missing date or time.\n"
 
         elif status == "non_meeting":
             log_text += "Outcome: Not a meeting request, logged only.\n"
+
+        elif status == "blacklisted":
+            log_text += "Outcome: Sender was blacklisted — ignored.\n"
+
+        elif status == "manual_review":
+            log_text += "Outcome: Requires manual review.\n"
+
+        elif status == "failed":
+            neg = entry.get("negotiation") or {}
+            log_text += f"Outcome: Negotiation failed — {neg.get('reason', 'unknown reason')}.\n"
 
     user_msg = (
         f"Summarize this email monitor session log. Output JSON only.\n"
@@ -302,6 +353,7 @@ def summarize_monitor_session(session_log: list[dict]) -> dict:
         print(f"[summarizer] Failed to parse session response:\n{response[:300]}")
         return _session_fallback(session_log)
 
+    # Enforce all required keys
     result.setdefault("session_overview",         "Session complete.")
     result.setdefault("meetings_booked",          [])
     result.setdefault("meetings_declined",        [])
@@ -359,6 +411,9 @@ def _session_fallback(session_log: list[dict]) -> dict:
         ],
         "attention_needed": [],
     }
+
+
+# ── Display helpers ───────────────────────────────────────────────────────────
 
 def print_email_summary(summary: dict, index: int | None = None) -> None:
     prefix = f"Email {index} — " if index else ""
