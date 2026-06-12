@@ -4,7 +4,8 @@ import json
 from datetime import datetime
 from ollama_client import ask_llm_chat
 from utils import extract_first_json, get_outlook_inbox
-from negotiation_agent import negotiate, negotiate_with_human, is_agent_email
+from negotiation_agent import negotiate, negotiate_with_human, is_agent_email, purge_active_negotiations
+from rag_store import query_sender_history, index_session
 from email_summarizer import summarize_email
 
 try:
@@ -107,7 +108,6 @@ def _strip_quoted_reply(body: str) -> str:
     HUMAN NEGOTIATION: critical for correct date extraction in multi-round threads.
     Also used for agent emails (harmless — agent emails don't contain these separators).
     """
-    print(f"[monitor:debug] Raw body: {repr(body[:500])}")
     import re
     # Common Outlook quoted-text separators
     separators = [
@@ -134,30 +134,82 @@ def _strip_quoted_reply(body: str) -> str:
 
 MEETING_CATEGORIES = {"meeting_request", "reply_needed"}
 
+# Domains that send automated/marketing emails - never route to negotiation agent.
+_MARKETING_DOMAINS = {
+    "zoom.us", "zoominfo.com", "mail.zoom.us", "no-reply.zoom.us",
+    "notifications.zoom.us", "noreply.zoom.us",
+    "mail.google.com", "accounts.google.com",
+    "microsoft.com", "microsoftonline.com",
+    "linkedin.com", "facebook.com", "twitter.com", "instagram.com",
+    "mailchimp.com", "sendgrid.net", "constantcontact.com",
+    "hubspot.com", "salesforce.com", "marketo.com",
+}
+
+_MARKETING_SUBJECT_PATTERNS = [
+    "unsubscribe", "no-reply", "noreply", "newsletter", "notification",
+    "booking page is ready", "free trial", "verify your", "confirm your email",
+    "password reset", "security alert", "invoice", "receipt",
+    "your account", "activate your", "welcome to",
+]
+
+
+def _is_marketing_email(email: dict) -> bool:
+    """
+    Detect automated/marketing emails that should never reach the negotiation agent.
+    Checks sender domain and subject line patterns.
+    """
+    sender  = email.get("email", "").lower()
+    subject = email.get("subject", "").lower()
+
+    domain = sender.split("@")[-1] if "@" in sender else ""
+    if any(domain == d or domain.endswith("." + d) for d in _MARKETING_DOMAINS):
+        return True
+
+    local = sender.split("@")[0] if "@" in sender else ""
+    if any(p in local for p in ("noreply", "no-reply", "donotreply",
+                                 "notifications", "mailer", "bounce",
+                                 "postmaster", "automailer")):
+        return True
+
+    if any(p in subject for p in _MARKETING_SUBJECT_PATTERNS):
+        return True
+
+    return False
+
+
 def _is_meeting_related(summary: dict, email: dict) -> bool:
     """
     Binary gate: should this email be passed to the negotiation agent?
-
-    First checks the summarizer's category — if it already classified the
-    email as meeting_request or reply_needed we trust that without a second
-    LLM call.
-
-    Falls back to a lightweight direct classification only when the summary
-    category is 'other' or missing, which covers counter-proposals and
-    acceptances that the summarizer may not categorise as meeting_request.
+    Rejects marketing/automated senders first, then checks summarizer category.
+    Falls back to LLM only when category is 'other' and body contains datetime patterns.
     """
+    if _is_marketing_email(email):
+        print("[monitor] Marketing/automated email detected - skipping.")
+        return False
+
     category = summary.get("category", "other")
 
-    # Direct hit from summarizer
     if category in MEETING_CATEGORIES:
         return True
 
-    # Summarizer said 'other' or 'information' — do a lightweight check
-    # because counter-proposals and acceptances often read as informational
+    if category == "information":
+        return False
+
+    import re as _re
+    body = email.get("body", "")
+    has_datetime = bool(_re.search(
+        r'\b(\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}|monday|tuesday|wednesday|thursday|friday|'
+        r'tomorrow|next week|am\b|pm\b)\b',
+        body, _re.IGNORECASE
+    ))
+    if not has_datetime:
+        return False
+
     DETECTOR_SYSTEM = """You are an email classifier. Output JSON only. Never explain.
-Determine if the email is related to scheduling a meeting in any way —
-this includes fresh requests, counter-proposals, acceptances, and rejections.
-Output: {"is_meeting_related": true/false}"""
+Determine if this is a PERSONAL email from a real human requesting, proposing, accepting,
+or rejecting a specific meeting. Do NOT return true for marketing emails, newsletters,
+automated notifications, or emails that merely mention scheduling features.
+Output: {\"is_meeting_related\": true/false}"""
 
     user_msg = (
         f"From: {email['from']} <{email['email']}>\n"
@@ -173,8 +225,6 @@ Output: {"is_meeting_related": true/false}"""
     except json.JSONDecodeError:
         return False
 
-
-# ── Outlook send / mark-read ──────────────────────────────────────────────────
 
 def _send_reply(reply: dict, ics: str | None = None) -> bool:
     """
@@ -310,6 +360,18 @@ def process_email(msg) -> dict | None:
     # is_agent_email() checks for X-AgentSystem: true in the body.
     # Human emails take the negotiate_with_human() path — no slot blocks,
     # natural prose replies, ICS attachment on confirmation.
+
+    # -- 4.5. RAG context query -----------------------------------------------
+    # RAG WEEK 12: retrieve prior interaction history with this sender.
+    # Attached to the email dict so negotiation agent can use it in prompts.
+    prior_context = query_sender_history(
+        sender_email = email.get('email', ''),
+        account      = _get_account(),
+    )
+    if prior_context:
+        email['prior_context'] = prior_context
+        print(f"[rag] Context retrieved for {email.get('email','')}.")
+
     print("[monitor] Passing to negotiation agent…")
     if is_agent_email(email.get("body", "")):
         neg_result = negotiate(email)
@@ -366,12 +428,19 @@ def process_email(msg) -> dict | None:
 # ── Poll / monitor loop ───────────────────────────────────────────────────────
 
 def poll_inbox() -> list[dict]:
-    """Check the inbox once and process all unread non-blacklisted emails."""
+    """
+    Check the inbox and process all unread emails.
+    Emails are dispatched to worker threads so multiple negotiations
+    can proceed concurrently without blocking each other.
+    Results are collected once all threads complete.
+    """
     if not WIN32_AVAILABLE:
         print("[monitor] win32com not available.")
         return []
 
-    results = []
+    results      = []
+    results_lock = threading.Lock()
+
     try:
         inbox    = get_outlook_inbox(_get_account())
         messages = inbox.Items
@@ -379,10 +448,38 @@ def poll_inbox() -> list[dict]:
         unread   = [msg for msg in messages if msg.UnRead]
         print(f"[monitor] Found {len(unread)} unread email(s).")
 
-        for msg in unread:
-            result = process_email(msg)
+        if not unread:
+            return []
+
+        if len(unread) == 1:
+            # Single email - no threading overhead needed
+            result = process_email(unread[0])
             if result:
                 results.append(result)
+            return results
+
+        # Multiple emails - process concurrently
+        # Each negotiation writes its own per-thread file so there is
+        # no file contention between workers.
+        def _worker(msg):
+            # COM objects must be initialised per thread on Windows
+            pythoncom.CoInitialize()
+            try:
+                result = process_email(msg)
+                if result:
+                    with results_lock:
+                        results.append(result)
+            except Exception as e:
+                print(f"[monitor] Worker error: {e}")
+            finally:
+                pythoncom.CoUninitialize()
+
+        threads = [threading.Thread(target=_worker, args=(msg,), daemon=True)
+                   for msg in unread]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=120)  # 2-minute per-email timeout
 
     except Exception as e:
         print(f"[monitor] Inbox poll error: {e}")
@@ -443,6 +540,15 @@ def stop_monitor() -> list[dict]:
     _monitor_thread = None
     with _session_log_lock:
         log_copy = list(_session_log)
+
+    # RAG WEEK 12: index session outcomes into ChromaDB for future context retrieval.
+    try:
+        indexed = index_session(log_copy, _get_account())
+        if indexed:
+            print(f"[rag] Session indexed: {indexed} document(s) stored.")
+    except Exception as e:
+        print(f"[rag] Session index failed (non-critical): {e}")
+
     return log_copy
 
 

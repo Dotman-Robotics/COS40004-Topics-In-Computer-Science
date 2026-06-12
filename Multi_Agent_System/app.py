@@ -16,7 +16,8 @@ from email_monitor import (
     add_to_blacklist, remove_from_blacklist, get_blacklist,
 )
 from email_summarizer import summarize_monitor_session
-from negotiation_agent import get_all_negotiations, simulate_negotiation, purge_active_negotiations
+from negotiation_agent import get_all_negotiations, simulate_negotiation, purge_active_negotiations, force_purge_all_negotiations
+from rag_store import query_context, index_session, get_all_documents, clear_collection, index_outreach_contact
 
 # Resolve GUI folder relative to this file so it works regardless of cwd
 _BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,10 @@ _GUI_FOLDER = os.path.join(_BASE_DIR, "gui")
 
 app = Flask(__name__, static_folder=_GUI_FOLDER, static_url_path="")
 CORS(app)
+
+# Suppress Flask request logs — only show errors
+import logging
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 # ── Serve GUI ─────────────────────────────────────────────────────────────────
 
@@ -260,8 +265,13 @@ def negotiations_get():
 
 @app.route("/api/negotiations/purge", methods=["POST"])
 def negotiations_purge():
-    """Manually purge all stale active negotiations and cancel their tentative calendar entries."""
-    purged = purge_active_negotiations()
+    """
+    Force-purge ALL active negotiations unconditionally — cancels all tentatives.
+    Use this between test runs or when the system is in a bad state.
+    For normal restarts, purge_active_negotiations() runs automatically on monitor start
+    and preserves resumable threads.
+    """
+    purged = force_purge_all_negotiations()
     return jsonify({"purged": purged})
 
 
@@ -300,6 +310,75 @@ def negotiations_simulate():
         "transcript": clean,
     })
 
+
+
+
+# -- RAG endpoints (Week 12) --------------------------------------------------
+
+@app.route("/api/rag/index", methods=["POST"])
+def rag_index():
+    """
+    RAG WEEK 12: manually trigger indexing of the current session log
+    and negotiation state into ChromaDB.
+    Normally called automatically by stop_monitor(), but exposed here
+    for testing and manual triggering from the GUI.
+    """
+    try:
+        from email_monitor import get_session_log
+        log     = get_session_log()
+        indexed = index_session(log)
+        return jsonify({"indexed": indexed, "status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e), "indexed": 0}), 500
+
+
+@app.route("/api/rag/query", methods=["POST"])
+def rag_query():
+    """
+    RAG WEEK 12: query the RAG store for context.
+    Body: { "query": str, "sender": str (optional), "top_k": int (optional) }
+    Returns matching documents and their metadata.
+    """
+    data         = request.get_json(force=True)
+    query        = (data.get("query") or "").strip()
+    sender_email = (data.get("sender") or "").strip() or None
+    top_k        = int(data.get("top_k", 3))
+
+    if not query and not sender_email:
+        return jsonify({"error": "query or sender required"}), 400
+
+    context = query_context(
+        query        = query or f"interactions with {sender_email}",
+        sender_email = sender_email,
+        top_k        = top_k,
+    )
+    docs = get_all_documents()
+    return jsonify({
+        "context":  context,
+        "docs":     docs,
+        "count":    len(docs),
+    })
+
+
+@app.route("/api/rag/documents", methods=["GET"])
+def rag_documents():
+    """
+    RAG WEEK 12: return all indexed documents for the current account.
+    Used by the GUI Memory panel to display what the system remembers.
+    """
+    docs = get_all_documents()
+    return jsonify({"documents": docs, "count": len(docs)})
+
+
+@app.route("/api/rag/clear", methods=["POST"])
+def rag_clear():
+    """
+    RAG WEEK 12: clear all indexed documents for the current account.
+    Useful between test runs to prevent stale context bleeding into new sessions.
+    The ChromaDB collection is preserved but emptied.
+    """
+    ok = clear_collection()
+    return jsonify({"cleared": ok})
 
 if __name__ == "__main__":
     print("Starting Agent GUI server at http://localhost:5000")

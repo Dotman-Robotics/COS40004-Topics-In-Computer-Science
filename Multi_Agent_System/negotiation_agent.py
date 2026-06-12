@@ -37,147 +37,270 @@ from utils import safe_parse_json
 
 # -- Config --------------------------------------------------------------------
 
-# Per-account state file so two instances in the same folder don't share state.
-# e.g. negotiations_zoomertron_outlook_com.json
-# Resolved at call time (not import time) to ensure --account CLI arg is always respected.
-def _get_state_file() -> str:
-    slug = os.environ.get("AGENT_ACCOUNT", "default").replace("@", "_").replace(".", "_")
-    return f"negotiations_{slug}.json"
+# -- Per-negotiation file storage -----------------------------------------------
+# Each negotiation thread gets its own JSON file:
+#   negotiations_<account>_<thread_id>.json
+# This eliminates all lock contention between concurrent negotiations —
+# two threads never read or write the same file simultaneously.
+# A lightweight index file tracks all thread IDs for get_all_negotiations().
+#   negotiations_<account>_index.json
 
 MAX_ROUNDS             = 5
 MAX_COUNTER_SLOTS      = 3   # Max slots offered in any single counter-proposal email
 AGENT_TAG              = "X-AgentSystem: true"
 
-# Delimiter for the machine-readable slot block embedded in counter emails.
 SLOT_BLOCK_START = "<<SLOTS_BEGIN>>"
 SLOT_BLOCK_END   = "<<SLOTS_END>>"
 
 WORK_HOURS_START = 8
-WORK_HOURS_END   = 17  # Slots must START before 17:00 - matches calendar_agent.BUSINESS_HOURS_END
+WORK_HOURS_END   = 17
 
-_state_lock = threading.Lock()
-
-# How many days to keep closed (confirmed/rejected/failed) threads before
-# pruning them from the state file. Active threads are always purged on startup.
 CLOSED_THREAD_RETENTION_DAYS = 7
+
+# Lock only used for the shared index file — individual thread files are lock-free
+_index_lock = threading.Lock()
+
+
+def _get_slug() -> str:
+    return os.environ.get("AGENT_ACCOUNT", "default").replace("@", "_").replace(".", "_")
+
+
+def _thread_file(thread_id: str) -> str:
+    """Path to the per-negotiation state file."""
+    return f"negotiations_{_get_slug()}_{thread_id}.json"
+
+
+def _index_file() -> str:
+    """Path to the lightweight index file."""
+    return f"negotiations_{_get_slug()}_index.json"
 
 
 # -- State persistence ---------------------------------------------------------
 
-def _load_state() -> dict:
+def _load_index() -> dict:
     try:
-        with open(_get_state_file(), "r", encoding="utf-8") as f:
+        with open(_index_file(), "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
-def _save_state(state: dict) -> None:
-    with open(_get_state_file(), "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, default=str)
+def _save_index(index: dict) -> None:
+    with open(_index_file(), "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=2, default=str)
 
 
 def _get_negotiation(thread_id: str) -> dict | None:
-    with _state_lock:
-        return _load_state().get(thread_id)
+    """Load a single negotiation record from its own file. No locking needed."""
+    try:
+        with open(_thread_file(thread_id), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
 
 def _upsert_negotiation(thread_id: str, data: dict) -> None:
-    with _state_lock:
-        state = _load_state()
-        state[thread_id] = data
-        _save_state(state)
+    """Write a single negotiation record to its own file. Update index."""
+    with open(_thread_file(thread_id), "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, default=str)
+    # Update the shared index (lightweight — status/title/dates only)
+    with _index_lock:
+        index = _load_index()
+        index[thread_id] = {
+            "status":     data.get("status", "active"),
+            "title":      data.get("title", "Meeting"),
+            "created_at": data.get("created_at", ""),
+            "closed_at":  data.get("closed_at", ""),
+            "human_thread": data.get("human_thread", False),
+        }
+        _save_index(index)
 
 
 def _close_negotiation(thread_id: str, final_status: str) -> None:
-    with _state_lock:
-        state = _load_state()
-        if thread_id in state:
-            state[thread_id]["status"]    = final_status
-            state[thread_id]["closed_at"] = datetime.now().isoformat()
-            _save_state(state)
-    # Prune old closed threads every time one closes
+    """Mark a negotiation closed in both its file and the index."""
+    rec = _get_negotiation(thread_id)
+    if rec:
+        rec["status"]    = final_status
+        rec["closed_at"] = datetime.now().isoformat()
+        _upsert_negotiation(thread_id, rec)
     _prune_closed_threads()
 
 
 def get_all_negotiations() -> dict:
-    with _state_lock:
-        return _load_state()
+    """
+    Return all negotiations as a dict keyed by thread_id.
+    Loads each full record from its individual file.
+    Falls back to index-only entries if a thread file is missing.
+    """
+    with _index_lock:
+        index = _load_index()
+    result = {}
+    for thread_id in index:
+        rec = _get_negotiation(thread_id)
+        result[thread_id] = rec if rec else index[thread_id]
+    return result
+# How long an active thread with no tentative can sit idle before being purged on restart
+STALE_THREAD_HOURS = 24
 
-
-# -- State cleanup -------------------------------------------------------------
 
 def purge_active_negotiations() -> int:
     """
-    Remove all threads with status 'active' from the state file.
-    Called on startup to clear negotiations that never resolved
-    (crashed mid-run, test runs, Outlook send failures, etc.).
+    Selective purge on monitor startup — preserves negotiations that were
+    progressing (tentative booked) so they can resume when the next email
+    arrives. Only purges threads that have no tentative or are too old.
 
-    Also cancels any orphaned tentative calendar entries stored in those threads
-    so they do not linger in Outlook.
+    Purge rules:
+    - Has entry_id (tentative booked) AND created recently -> KEEP, will resume
+    - Has entry_id AND older than STALE_THREAD_HOURS -> PURGE (abandoned)
+    - No entry_id (crashed before booking) -> PURGE, start fresh
 
-    Returns the number of threads purged.
+    Returns number of threads purged.
+    Use force_purge_all_negotiations() to wipe everything regardless.
     """
     from calendar_agent import cancel_tentative
 
-    with _state_lock:
-        state   = _load_state()
-        to_purge = {
-            tid: data for tid, data in state.items()
-            if data.get("status") == "active"
-        }
+    stale_cutoff = datetime.now().timestamp() - (STALE_THREAD_HOURS * 3600)
 
-        for tid, data in to_purge.items():
-            entry_id = data.get("entry_id")
-            title    = data.get("title", "Meeting")
-            if entry_id:
-                print(f"[negotiation] Cancelling orphaned tentative: '{title}' (thread: {tid!r})")
-                try:
-                    cancel_tentative(entry_id, title)
-                except Exception as e:
-                    print(f"[negotiation] Could not cancel tentative for {tid!r}: {e}")
-            del state[tid]
+    with _index_lock:
+        index    = _load_index()
+        active   = {tid: meta for tid, meta in index.items()
+                    if meta.get("status") == "active"}
 
-        if to_purge:
-            _save_state(state)
-            print(f"[negotiation] Purged {len(to_purge)} stale active thread(s) on startup.")
+    purged  = 0
+    resumed = 0
+
+    for tid, meta in active.items():
+        rec      = _get_negotiation(tid)
+        entry_id = (rec or {}).get("entry_id")
+        title    = (rec or meta).get("title", "Meeting")
+        created  = (rec or {}).get("created_at", "")
+
+        # Check age
+        is_stale = True
+        if created:
+            try:
+                is_stale = datetime.fromisoformat(created).timestamp() < stale_cutoff
+            except ValueError:
+                pass
+
+        if entry_id and not is_stale:
+            # KEEP — tentative exists and thread is recent, will resume on next email
+            print(f"[negotiation] Resumable thread kept: '{title}' (thread: {tid!r}) "
+                  f"— tentative at EntryID {entry_id[:20]}...")
+            resumed += 1
+            continue
+
+        # PURGE — no tentative or too old
+        if entry_id:
+            print(f"[negotiation] Cancelling stale tentative: '{title}' (thread: {tid!r})")
+            try:
+                cancel_tentative(entry_id, title)
+            except Exception as e:
+                print(f"[negotiation] Could not cancel tentative for {tid!r}: {e}")
         else:
-            print(f"[negotiation] No stale active threads found.")
+            print(f"[negotiation] Purging thread with no tentative: '{title}' (thread: {tid!r})")
 
-    return len(to_purge)
+        try:
+            os.remove(_thread_file(tid))
+        except FileNotFoundError:
+            pass
+        with _index_lock:
+            idx = _load_index()
+            idx.pop(tid, None)
+            _save_index(idx)
+        purged += 1
+
+    if purged:
+        print(f"[negotiation] Purged {purged} stale thread(s) on startup.")
+    if resumed:
+        print(f"[negotiation] {resumed} active thread(s) kept — will resume on next email.")
+    if not purged and not resumed:
+        print(f"[negotiation] No stale active threads found.")
+
+    return purged
+
+
+def force_purge_all_negotiations() -> int:
+    """
+    FAILSAFE — purges ALL active negotiations unconditionally regardless of
+    whether they have a tentative or how recent they are.
+    Cancels all tentative calendar entries.
+    Use this between test runs or when the system is in a bad state.
+
+    Called by POST /api/negotiations/purge from the GUI.
+    Also available from CLI: planner input 'purge all negotiations'.
+    """
+    from calendar_agent import cancel_tentative
+
+    with _index_lock:
+        index  = _load_index()
+        active = {tid: meta for tid, meta in index.items()
+                  if meta.get("status") == "active"}
+
+    purged = 0
+    for tid, meta in active.items():
+        rec      = _get_negotiation(tid)
+        entry_id = (rec or {}).get("entry_id")
+        title    = (rec or meta).get("title", "Meeting")
+
+        if entry_id:
+            print(f"[negotiation] Force-cancelling tentative: '{title}' (thread: {tid!r})")
+            try:
+                cancel_tentative(entry_id, title)
+            except Exception as e:
+                print(f"[negotiation] Could not cancel tentative for {tid!r}: {e}")
+
+        try:
+            os.remove(_thread_file(tid))
+        except FileNotFoundError:
+            pass
+        with _index_lock:
+            idx = _load_index()
+            idx.pop(tid, None)
+            _save_index(idx)
+        purged += 1
+
+    if purged:
+        print(f"[negotiation] Force-purged {purged} active thread(s).")
+    else:
+        print(f"[negotiation] No active threads to force-purge.")
+
+    return purged
 
 
 def _prune_closed_threads() -> None:
     """
-    Remove confirmed/rejected/failed threads older than CLOSED_THREAD_RETENTION_DAYS.
-    Called automatically every time a negotiation closes.
-    Silent - does not print unless something is pruned.
+    Delete per-thread files for confirmed/rejected/failed threads older than
+    CLOSED_THREAD_RETENTION_DAYS. Called automatically when a negotiation closes.
     """
-    cutoff = datetime.now().timestamp() - (CLOSED_THREAD_RETENTION_DAYS * 86400)
+    cutoff   = datetime.now().timestamp() - (CLOSED_THREAD_RETENTION_DAYS * 86400)
+    terminal = {"confirmed", "rejected", "failed"}
 
-    with _state_lock:
-        state    = _load_state()
-        terminal = {"confirmed", "rejected", "failed"}
+    with _index_lock:
+        index    = _load_index()
         to_prune = []
 
-        for tid, data in state.items():
-            if data.get("status") not in terminal:
+        for tid, meta in index.items():
+            if meta.get("status") not in terminal:
                 continue
-            closed_at = data.get("closed_at", "")
+            closed_at = meta.get("closed_at", "")
             if not closed_at:
                 continue
             try:
-                closed_ts = datetime.fromisoformat(closed_at).timestamp()
-                if closed_ts < cutoff:
+                if datetime.fromisoformat(closed_at).timestamp() < cutoff:
                     to_prune.append(tid)
             except ValueError:
                 continue
 
         for tid in to_prune:
-            del state[tid]
+            index.pop(tid, None)
+            try:
+                os.remove(_thread_file(tid))
+            except FileNotFoundError:
+                pass
 
         if to_prune:
-            _save_state(state)
+            _save_index(index)
             print(f"[negotiation] Pruned {len(to_prune)} old closed thread(s) "
                   f"(>{CLOSED_THREAD_RETENTION_DAYS} days).")
 
@@ -1231,14 +1354,21 @@ def _human_classify_email(email: dict) -> dict:
     """
     import re as _re
 
-    # Extract only the sender's new text (first paragraph, CRLF-aware)
+    # Extract sender's new text — take up to 3 paragraphs if the first
+    # contains no date/time pattern. This handles replies where the greeting
+    # is on line 1 and the proposed time is on line 2 or 3.
     raw_body = email.get('body', '')
     segments = _re.split(r'\r?\n\r?\n', raw_body)
-    classify_body = next(
-        (s.strip() for s in segments if len(s.strip()) >= 5),
-        raw_body[:200]
-    )
-    print(f"[negotiation:human] Classify body: {repr(classify_body[:150])}")
+    # Filter to non-empty segments from the top of the email
+    clean_segs = [s.strip() for s in segments if len(s.strip()) >= 5]
+
+    # Check if first paragraph has a date/time — if not, include up to 3 paragraphs
+    DATE_TIME_RE = _re.compile(r'\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}')
+    classify_body = clean_segs[0] if clean_segs else raw_body[:200]
+    if clean_segs and not DATE_TIME_RE.search(classify_body):
+        # Expand to cover up to 3 paragraphs to capture time on next line
+        classify_body = '\n\n'.join(clean_segs[:3])
+
 
     # HUMAN NEGOTIATION: regex slot extraction — never hallucinate.
     # Matches 'HH:MM YYYY-MM-DD' (our documented format) in any order.

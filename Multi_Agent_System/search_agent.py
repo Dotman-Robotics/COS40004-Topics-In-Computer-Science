@@ -166,6 +166,8 @@ def _find_contact_page_url(html: str, base_url: str) -> str | None:
     for tag in soup.find_all("a", href=True):
         href = tag["href"].lower().rstrip("/")
         slug = href.split("/")[-1]
+        # Strip .html extension so both /contact and /contact.html match
+        slug = re.sub(r"\.html?$", "", slug)
         if slug in CONTACT_PAGE_HINTS:
             return urljoin(base_url, tag["href"])
     return None
@@ -211,15 +213,15 @@ def scrape_provider(url: str, title: str) -> dict:
     phones  = _extract_phones(html)
     provider["scraped_from"].append(url)
 
-    # If homepage yielded nothing, try the contact page
-    if not emails and not phones:
-        contact_url = _find_contact_page_url(html, url)
-        if contact_url and contact_url != url:
-            contact_html = _fetch_html(contact_url)
-            if contact_html:
-                emails |= _extract_emails(contact_html, url)
-                phones |= _extract_phones(contact_html)
-                provider["scraped_from"].append(contact_url)
+    # Always try the contact page to collect additional emails/phones —
+    # not just as a fallback when the homepage yields nothing.
+    contact_url = _find_contact_page_url(html, url)
+    if contact_url and contact_url != url:
+        contact_html = _fetch_html(contact_url)
+        if contact_html:
+            emails |= _extract_emails(contact_html, url)
+            phones |= _extract_phones(contact_html)
+            provider["scraped_from"].append(contact_url)
 
     provider["emails"] = sorted(emails)
     provider["phones"] = sorted(phones)
@@ -275,13 +277,30 @@ def draft_outreach_email(provider: dict, task_description: str, extra_context: s
         f"JSON:"
     )
 
+    # RAG WEEK 12: index outreach contact before LLM call so it always runs
+    try:
+        from rag_store import index_outreach_contact
+        index_outreach_contact(provider, task_description)
+    except Exception as e:
+        print(f"[search] RAG index skipped: {e}")
+
     response = ask_llm_chat(OUTREACH_SYSTEM, user_msg)
     result   = safe_parse_json(response)
 
     if not result:
-        return {"error": "Could not draft email — LLM returned no valid JSON."}
+        # Fallback template - LLM failed but outreach can still proceed
+        print("[search] LLM draft failed - using fallback template.")
+        result = {
+            "subject": f"Enquiry - {task_description[:60].title()}",
+            "body": (
+                f"Hi,\n\n"
+                f"We are interested in your services regarding: {task_description}.\n\n"
+                f"Could you please provide more information and a quote?\n\n"
+                f"Best regards,\n[YOUR NAME]\n[YOUR COMPANY]"
+            ),
+        }
 
-    result.setdefault("subject", f"Enquiry — {task_description[:60]}")
+    result.setdefault("subject", f"Enquiry - {task_description[:60]}")
     result.setdefault("body",    "Please provide a quote for the work described.")
     result["to"]       = to_email
     result["provider"] = provider["name"]
